@@ -1,6 +1,7 @@
 # KOKUM WIRE
 
-Semiconductor supply chain intelligence. A dated signal ledger (Layer 3), an
+Understand what changed overnight across memory, foundries, packaging, and
+suppliers. A dated signal ledger (Layer 3), an
 LLM dispatch composer (Layer 2), and a one-question whiteboard front end
 (Layer 1), in one small FastAPI app.
 
