@@ -77,10 +77,16 @@ def init_db():
                 note          TEXT NOT NULL,          -- one-line interpretation
                 source        TEXT NOT NULL,          -- e.g. 'Intel Q1 2023 earnings call'
                 source_url    TEXT DEFAULT '',
-                tags          TEXT DEFAULT ''         -- comma-separated: 'intel,fab,europe,mcu'
+                tags          TEXT DEFAULT '',        -- comma-separated: 'intel,fab,europe,mcu'
+                verdict_horizon TEXT DEFAULT ''       -- YYYY-MM-DD by which a forward call
+                                                      -- can be scored true/false ('' = not a call)
             )
             """
         )
+        # Idempotent migration: add verdict_horizon to a pre-existing table.
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(signals)")}
+        if "verdict_horizon" not in cols:
+            conn.execute("ALTER TABLE signals ADD COLUMN verdict_horizon TEXT DEFAULT ''")
 
 
 init_db()
@@ -95,6 +101,9 @@ class SignalIn(BaseModel):
     source: str
     source_url: str = ""
     tags: str = ""
+    verdict_horizon: str = Field(
+        "", description="YYYY-MM-DD by which this call can be scored true/false; blank if not a forward call"
+    )
 
 
 class AskIn(BaseModel):
@@ -106,8 +115,8 @@ def insert_signal(s: SignalIn) -> int:
         cur = conn.execute(
             """INSERT INTO signals
                (logged_at, observed_date, entity, signal_type, severity,
-                note, source, source_url, tags)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+                note, source, source_url, tags, verdict_horizon)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (
                 datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 s.observed_date,
@@ -118,6 +127,7 @@ def insert_signal(s: SignalIn) -> int:
                 s.source.strip(),
                 s.source_url.strip(),
                 s.tags.strip().lower(),
+                s.verdict_horizon.strip(),
             ),
         )
         return cur.lastrowid
@@ -272,6 +282,7 @@ def ask(body: AskIn):
                 "date": fmt_date(s["observed_date"]),
                 "text": s["note"],
                 "source": s["source"],
+                "horizon": s["verdict_horizon"],
             }
             for s in signals[:8]
         ],

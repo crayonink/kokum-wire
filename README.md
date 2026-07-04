@@ -46,12 +46,19 @@ curl -X POST https://<your-app>/signals \
     "note": "Advanced packaging capacity commentary tightening on Q2 call.",
     "source": "TSMC Q2 2026 earnings call",
     "source_url": "https://...",
-    "tags": "tsmc,cowos,packaging,ai"
+    "tags": "tsmc,cowos,packaging,ai",
+    "verdict_horizon": "2026-09-30"
   }'
 ```
 
 `signal_type` vocabulary: `capex_cut`, `equipment_absence`, `hiring`,
 `subsidy`, `customs`, `allocation`, `other`. Severity 1 (noise) → 5 (alarm).
+
+`verdict_horizon` (optional, `YYYY-MM-DD`) is the date by which a *forward-looking*
+call can be scored true or false — leave it blank for backward-looking or
+purely informational rows. It's what lets the ledger prove a call *now*, not
+just backtest history: a row logged today with a horizon inside the week can be
+graded against reality before you show the demo.
 
 ## Endpoints
 
