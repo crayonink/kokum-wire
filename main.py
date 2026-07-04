@@ -110,6 +110,18 @@ class AskIn(BaseModel):
     question: str = ""
 
 
+class DecideIn(BaseModel):
+    part_class: str = Field(
+        ..., description="e.g. 'eMMC/UFS automotive', 'DRAM', 'NAND'"
+    )
+    monthly_volume: int = Field(
+        0, ge=0, description="units per month (optional, for sizing the shortfall)"
+    )
+    coverage_months: float = Field(
+        0, ge=0, description="months of inventory + contracted supply on hand"
+    )
+
+
 def insert_signal(s: SignalIn) -> int:
     with db() as conn:
         cur = conn.execute(
@@ -333,6 +345,204 @@ def compose_fallback(question: str, signals: list[dict]) -> dict:
 
 
 # ----------------------------------------------------------------------
+# Layer 2b — the decision engine ("buy now vs. later")
+#
+# Deterministic and inspectable: transparent thresholds over the ledger's own
+# verdicts, with the dated rows as the evidence trail. No LLM — a procurement
+# lead can audit exactly which signal tripped which recommendation, and every
+# claim carries a date and a source. This is the "what should I do" rung of the
+# ladder, derived only from signals we actually track (never a hallucinated
+# optimization).
+# ----------------------------------------------------------------------
+def _haystack(r: dict) -> str:
+    return " ".join([r["entity"], r["note"], r["tags"], r["signal_type"]]).lower()
+
+
+def _has(r: dict, terms) -> bool:
+    h = _haystack(r)
+    return any(t in h for t in terms)
+
+
+def _ddmmyyyy(d: str) -> str:
+    try:
+        return datetime.strptime(d, "%Y-%m-%d").strftime("%d %b %Y")
+    except ValueError:
+        return d
+
+
+def _cite(r: dict) -> str:
+    return f"{r['source']}, {_ddmmyyyy(r['observed_date'])}"
+
+
+# Terms that classify a row into the two axes the decision reconciles.
+_ALLOC_TERMS = [
+    "sold out", "sold-out", "short of demand", "half to two-thirds",
+    "allocation", "allocated", "lowest allocation", "lockout",
+]
+_TOP_TERMS = [
+    "cycle top", "top forming", "inflection", "balk", "peak", "asps peaking",
+]
+_STRUCT_TERMS = [
+    "late 2027", "2027-2028", "new capacity", "structural",
+]
+_TIGHTEST_TERMS = [
+    "lowest allocation priority", "lowest priority", "tightest gap", "hardest",
+]
+
+
+def decide_buy_timing(part_class: str, monthly_volume: int,
+                      coverage_months: float) -> dict:
+    """Reconcile the two live tensions for a memory buyer — allocation is tight
+    (2026 sold out) but a cycle top may be forming — into a timing call, sized
+    against the buyer's own coverage. Every recommendation is traced to a dated
+    ledger row."""
+    part_rows = retrieve(part_class, limit=25)
+    with db() as conn:
+        all_rows = [
+            dict(r) for r in conn.execute(
+                "SELECT * FROM signals ORDER BY severity DESC, observed_date DESC"
+            )
+        ]
+
+    alloc_rows = [r for r in all_rows
+                  if r["signal_type"] == "allocation" or _has(r, _ALLOC_TERMS)]
+    top_rows = [r for r in all_rows if _has(r, _TOP_TERMS)]
+    struct_rows = [r for r in all_rows if _has(r, _STRUCT_TERMS)]
+
+    allocation_risk = max((r["severity"] for r in alloc_rows), default=0)
+    price_top = any(r["severity"] >= 3 for r in top_rows)
+    part_flag = next((r for r in part_rows if _has(r, _TIGHTEST_TERMS)), None)
+
+    verdict = ("DOUBTFUL" if allocation_risk >= 5 else
+               "CONCERN" if allocation_risk == 4 else
+               "WATCH" if allocation_risk == 3 else "CLEAR")
+
+    # Honest bail-out: the part class isn't in the ledger's coverage (no rows
+    # match it), or the ledger holds nothing to reason over. Without this gate
+    # the market-wide memory signals would fire for any part — even ones the
+    # ledger has never tracked.
+    if not part_rows or (allocation_risk == 0 and not top_rows and not struct_rows):
+        return {
+            "part_class": part_class, "verdict": "CLEAR", "urgency": "LOW",
+            "headline": "No signal on the ledger for this part class yet — "
+                        "scope it to a memory part family the ledger tracks "
+                        "(DRAM, NAND, eMMC/UFS), or log signals for it first.",
+            "allocation_action": "Log signals for this part class, then re-run.",
+            "price_action": "—",
+            "coverage_target_months": 0, "coverage_gap_months": 0,
+            "rationale": [], "evidence": [],
+            "inputs": {"part_class": part_class, "monthly_volume": monthly_volume,
+                       "coverage_months": coverage_months},
+            "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
+        }
+
+    # Coverage math: prudent buffer scales with how tight allocation is.
+    target_cover = 6 if allocation_risk >= 4 else 4 if allocation_risk == 3 else 2
+    gap_months = round(max(0.0, target_cover - coverage_months), 1)
+    buffer_units = int(monthly_volume * coverage_months)
+    gap_units = int(monthly_volume * gap_months)
+
+    if allocation_risk >= 4 and coverage_months < 3:
+        urgency = "URGENT"
+    elif allocation_risk >= 4:
+        urgency = "HIGH"
+    elif allocation_risk == 3:
+        urgency = "MEDIUM"
+    else:
+        urgency = "LOW"
+
+    if allocation_risk >= 4:
+        allocation_action = ("Lock allocation now — contract the fullest "
+                             "volume and tenor you can secure.")
+    elif allocation_risk == 3:
+        allocation_action = ("Start locking allocation this quarter — the "
+                             "market is tightening.")
+    else:
+        allocation_action = "No allocation pressure — standard procurement cadence."
+
+    if price_top:
+        price_action = ("Keep price exposure SHORT — prefer index-linked or "
+                        "short-tenor terms over long fixed prices. A contested "
+                        "cycle-top call is live.")
+    else:
+        price_action = "Standard price terms — no cycle-top signal on the ledger."
+
+    if allocation_risk >= 4 and price_top:
+        headline = "Lock allocation now; keep price exposure short."
+    elif allocation_risk >= 4:
+        headline = "Lock allocation now."
+    elif allocation_risk == 3 and price_top:
+        headline = "Begin locking allocation; keep price exposure short."
+    elif price_top:
+        headline = "No allocation pressure; keep price exposure short."
+    else:
+        headline = "Standard cadence — no urgent timing signal."
+
+    # Rationale — each line traced to a real dated row.
+    rationale, used = [], []
+    if alloc_rows:
+        r = max(alloc_rows, key=lambda x: x["severity"])
+        rationale.append(f"2026 supply is allocated (severity {r['severity']}/5): "
+                         f"{r['note']} ({_cite(r)}).")
+        used.append(r)
+    if part_flag and part_flag["id"] not in {u["id"] for u in used}:
+        rationale.append("Your part class sits in the tightest segment: "
+                         f"{part_flag['note']} ({_cite(part_flag)}).")
+        used.append(part_flag)
+    if price_top:
+        r = max(top_rows, key=lambda x: x["severity"])
+        rationale.append("But a cycle top may be forming — reason not to lock "
+                         f"long fixed prices: {r['note']} ({_cite(r)}).")
+        used.append(r)
+    if struct_rows:
+        r = struct_rows[0]
+        rationale.append(f"The squeeze is structural, not a blip: {r['note']} "
+                         f"({_cite(r)}).")
+        used.append(r)
+    if coverage_months is not None:
+        line = f"You hold {coverage_months:g} months of cover"
+        if monthly_volume:
+            line += f" (~{buffer_units:,} units)"
+        line += f" against a prudent {target_cover}-month buffer for this risk level"
+        if gap_months > 0:
+            line += f" — a {gap_months:g}-month"
+            if monthly_volume:
+                line += f" / ~{gap_units:,}-unit"
+            line += " shortfall to close."
+        else:
+            line += (" — near-term cover is adequate, but allocation must "
+                     "still be secured ahead of the sold-out window.")
+        rationale.append(line)
+
+    seen, evidence = set(), []
+    for r in used:
+        if r["id"] in seen:
+            continue
+        seen.add(r["id"])
+        evidence.append({
+            "date": r["observed_date"], "entity": r["entity"],
+            "text": r["note"], "source": r["source"],
+            "source_url": r.get("source_url", ""), "horizon": r["verdict_horizon"],
+        })
+
+    return {
+        "part_class": part_class,
+        "verdict": verdict,
+        "urgency": urgency,
+        "headline": headline,
+        "allocation_action": allocation_action,
+        "price_action": price_action,
+        "coverage_target_months": target_cover,
+        "coverage_gap_months": gap_months,
+        "rationale": rationale,
+        "evidence": evidence,
+        "inputs": {"part_class": part_class, "monthly_volume": monthly_volume,
+                   "coverage_months": coverage_months},
+        "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
+    }
+
+
+# ----------------------------------------------------------------------
 # Routes
 # ----------------------------------------------------------------------
 @app.post("/ask")
@@ -371,6 +581,13 @@ def ask(body: AskIn):
         ],
         "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
     }
+
+
+@app.post("/decide")
+def decide(body: DecideIn):
+    return decide_buy_timing(
+        body.part_class.strip(), body.monthly_volume, body.coverage_months
+    )
 
 
 @app.post("/signals", status_code=201)
