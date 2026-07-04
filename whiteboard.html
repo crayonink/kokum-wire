@@ -65,6 +65,51 @@
 
   .dispatch-line::before, .dispatch-line::after { content: " — "; }
 
+  /* ---------- Hero ---------- */
+  .tagline {
+    margin-top: 12px;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+  }
+  .hero-sub {
+    margin: 14px auto 0;
+    max-width: 560px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink-faint);
+  }
+  .source-strip {
+    list-style: none;
+    margin: 18px auto 0;
+    max-width: 600px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 18px;
+    padding: 0;
+  }
+  .source-strip li {
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    white-space: nowrap;
+  }
+  .source-strip li::before {
+    content: "\2713";
+    color: var(--ledger-blue);
+    font-weight: 700;
+    margin-right: 6px;
+  }
+  .dateline {
+    margin-top: 14px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+  }
+
   .rule {
     margin: 22px auto 0;
     width: 100%;
@@ -347,8 +392,18 @@
 
   <header>
     <div class="masthead">Kokum Wire</div>
-    <div class="dispatch-line">Understand what changed overnight across memory, foundries, packaging, and suppliers<span id="station-date"></span></div>
+    <div class="tagline">AI Supply Intelligence for Semiconductor Procurement</div>
+    <p class="hero-sub">Monitor earnings calls, export data, equipment orders, hiring, and subsidies to catch supply-chain risk before it hits purchasing — every answer dated and sourced.</p>
+    <ul class="source-strip" aria-label="Signals the ledger tracks">
+      <li>Earnings calls</li>
+      <li>Export &amp; customs</li>
+      <li>Hiring trends</li>
+      <li>Equipment shipments</li>
+      <li>Government filings</li>
+      <li>Packaging capacity</li>
+    </ul>
     <hr class="rule" aria-hidden="true">
+    <div class="dateline"><span id="station-date"></span></div>
   </header>
 
   <main>
