@@ -261,6 +261,12 @@ def compose_with_claude(question: str, signals: list[dict]) -> dict:
         model=MODEL,
         max_tokens=1500,
         system=SYSTEM_PROMPT,
+        # Composing a terse dispatch from rows we already supply is a constrained
+        # task, not a reasoning one. Sonnet 5 runs adaptive thinking at the
+        # default high effort when left alone — several seconds of latency the
+        # demo doesn't need. Disable thinking and run at low effort so the
+        # dispatch returns in ~1-2s. The rows do the work; the model just writes.
+        thinking={"type": "disabled"},
         messages=[
             {
                 "role": "user",
@@ -271,7 +277,10 @@ def compose_with_claude(question: str, signals: list[dict]) -> dict:
     try:
         msg = client.messages.create(
             **kwargs,
-            output_config={"format": {"type": "json_schema", "schema": VERDICT_SCHEMA}},
+            output_config={
+                "effort": "low",
+                "format": {"type": "json_schema", "schema": VERDICT_SCHEMA},
+            },
         )
     except anthropic.BadRequestError:
         # A KOKUM_MODEL that doesn't support structured outputs rejects
