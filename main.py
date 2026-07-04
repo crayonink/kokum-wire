@@ -137,12 +137,44 @@ STOPWORDS = {
     "what", "whats", "what's", "new", "the", "in", "on", "for", "with",
     "is", "are", "of", "a", "an", "any", "latest", "update", "updates",
     "news", "about", "tell", "me", "and", "to", "how",
+    # question filler that shouldn't drive matching
+    "there", "was", "were", "be", "been", "being", "has", "have", "had",
+    "do", "does", "did", "we", "you", "i", "it", "its", "it's", "this",
+    "that", "these", "those", "get", "getting", "got", "will", "would",
+    "when", "where", "who", "which", "why", "going", "happening", "happen",
+    "going", "at", "as", "by", "or", "from", "up", "out", "now", "still",
+    "going", "anything", "something",
+}
+
+# Domain synonyms: a query term also matches rows that use these words. This
+# lets natural questions ('is there a NAND shortage?') hit rows that phrase the
+# same idea differently ('sold out', 'half to two-thirds', 'allocation').
+SYNONYMS = {
+    "shortage": ["tight", "tightness", "sold out", "short of demand",
+                 "constrained", "allocation", "scarce", "crunch", "sold"],
+    "shortages": ["tight", "sold out", "allocation", "crunch"],
+    "tight": ["shortage", "sold out", "allocation", "constrained"],
+    "allocation": ["allocated", "sold out", "lockout", "quota", "fulfil",
+                   "fulfill", "sold"],
+    "price": ["cost", "asp", "pricing", "contract price"],
+    "prices": ["cost", "costs", "asp", "pricing"],
+    "pricing": ["cost", "price", "asp"],
+    "cost": ["price", "pricing", "asp"],
+    "memory": ["dram", "nand", "hbm", "ddr5", "flash"],
+    "supply": ["capacity", "wafer", "bit-supply"],
+    "capacity": ["supply", "wafer", "fab"],
+    "automotive": ["auto", "car", "vehicle", "mcu", "embedded"],
+    "recover": ["relief", "recovery", "ease", "normalize"],
+    "recovery": ["relief", "recover", "ease"],
+    "shortfall": ["shortage", "short of demand"],
+    "flash": ["nand", "ssd"],
+    "oem": ["dell", "cisco", "hp", "lenovo", "server", "pc"],
 }
 
 
 def retrieve(question: str, limit: int = 25) -> list[dict]:
-    """Keyword retrieval over entity / note / tags / signal_type.
-    Empty or generic question ("what's new?") -> most recent signals."""
+    """Keyword retrieval over entity / note / tags / signal_type, with synonym
+    expansion. Empty or generic question ("what's new?") -> most recent signals."""
     words = [
         w for w in re.findall(r"[a-z0-9']+", question.lower())
         if w not in STOPWORDS and len(w) > 1
@@ -155,16 +187,18 @@ def retrieve(question: str, limit: int = 25) -> list[dict]:
     if not words:
         return [dict(r) for r in rows[:limit]]
 
-    # Score each row by how many query terms it matches; require a majority
-    # so 'samsung taylor fab' can't hit Magdeburg rows on 'fab' alone.
-    needed = max(1, (len(words) + 1) // 2)
+    # For each query word, the set of terms that count as a hit (the word plus
+    # its synonyms). A row scores 1 per query word for which ANY of its terms
+    # appears in the haystack.
+    term_sets = [[w] + SYNONYMS.get(w, []) for w in words]
+
     scored = []
     for r in rows:
         haystack = " ".join(
             [r["entity"], r["note"], r["tags"], r["signal_type"]]
         ).lower()
-        score = sum(1 for w in words if w in haystack)
-        if score >= needed:
+        score = sum(1 for terms in term_sets if any(t in haystack for t in terms))
+        if score >= 1:  # any strong term matches; ranking floats the best rows up
             scored.append((score, dict(r)))
     # Highest score first; within an equal score, most recent observation first.
     scored.sort(key=lambda t: (t[0], t[1]["observed_date"]), reverse=True)
@@ -219,11 +253,20 @@ def compose_with_claude(question: str, signals: list[dict]) -> dict:
             }
         ],
     )
-    text = "".join(b.text for b in msg.content if b.type == "text")
-    text = re.sub(r"^```(?:json)?|```$", "", text.strip(), flags=re.M).strip()
-    data = json.loads(text)
+    text = "".join(b.text for b in msg.content if b.type == "text").strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.S).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        # Tolerate a stray preamble/suffix: pull the outermost JSON object.
+        m = re.search(r"\{.*\}", text, re.S)
+        if not m:
+            raise
+        data = json.loads(m.group(0))
     if data.get("verdict") not in VERDICTS:
         data["verdict"] = "WATCH"
+    if not data.get("answer"):
+        raise ValueError("LLM response missing 'answer'")
     return data
 
 
@@ -263,7 +306,12 @@ def ask(body: AskIn):
     if ANTHROPIC_API_KEY:
         try:
             composed = compose_with_claude(body.question, signals)
-        except Exception:
+        except Exception as e:
+            # Log WHY we fell back so it shows in the server/Railway logs —
+            # a set-but-broken key (bad model, no quota, parse error) otherwise
+            # degrades silently to the "[Composed without LLM]" fallback.
+            print(f"[/ask] LLM compose failed, using fallback: "
+                  f"{type(e).__name__}: {e}", flush=True)
             composed = compose_fallback(body.question, signals)
     else:
         composed = compose_fallback(body.question, signals)
