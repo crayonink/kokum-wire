@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KOKUM WIRE — What's new?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F2EA;
+    --ink: #1B1A17;
+    --ink-faint: #6B675C;
+    --ribbon-red: #A8332A;
+    --ledger-blue: #5B6E8C;
+    --rule: #D8D2C2;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    color: var(--ink);
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 31px,
+        rgba(91,110,140,0.05) 31px,
+        rgba(91,110,140,0.05) 32px
+      ),
+      var(--paper);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px;
+  }
+
+  .sheet {
+    width: 100%;
+    max-width: 680px;
+    padding: 48px 0 96px;
+  }
+
+  /* ---------- Masthead ---------- */
+  header { text-align: center; margin-bottom: 40px; }
+
+  .masthead {
+    font-family: 'Special Elite', 'Courier Prime', monospace;
+    font-size: clamp(26px, 6vw, 40px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .dispatch-line {
+    margin-top: 10px;
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+  }
+
+  .dispatch-line::before, .dispatch-line::after { content: " — "; }
+
+  .rule {
+    margin: 22px auto 0;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid var(--ink);
+    position: relative;
+  }
+  .rule::after {
+    content: "";
+    display: block;
+    border-top: 1px solid var(--ink);
+    margin-top: 3px;
+  }
+
+  /* ---------- Question ---------- */
+  .prompt-label {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 14px;
+  }
+
+  .ask-row { display: flex; align-items: baseline; gap: 10px; }
+
+  .caret-mark {
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--ribbon-red);
+    user-select: none;
+  }
+
+  #question {
+    flex: 1;
+    font-family: 'Courier Prime', monospace;
+    font-size: 20px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    padding: 6px 2px 8px;
+    outline: none;
+    border-radius: 0;
+  }
+  #question::placeholder { color: var(--ink-faint); opacity: 0.8; font-style: italic; }
+  #question:focus-visible { border-bottom: 2px solid var(--ribbon-red); }
+
+  .ask-hint {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  .ask-hint kbd {
+    font-family: inherit;
+    border: 1px solid var(--rule);
+    padding: 1px 5px;
+    font-size: 11px;
+    background: rgba(255,255,255,0.5);
+  }
+
+  button.send {
+    font-family: 'Courier Prime', monospace;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  button.send:hover { background: var(--ribbon-red); }
+  button.send:focus-visible { outline: 2px solid var(--ribbon-red); outline-offset: 2px; }
+  button.send:disabled { opacity: 0.4; cursor: default; }
+
+  /* ---------- Dispatch (answer) ---------- */
+  .dispatch {
+    margin-top: 56px;
+    display: none;
+  }
+  .dispatch.visible { display: block; }
+
+  .dispatch-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    border-top: 1px solid var(--ink);
+    padding-top: 14px;
+    margin-bottom: 22px;
+  }
+
+  .dispatch-meta {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+    line-height: 1.9;
+  }
+
+  .stamp {
+    font-family: 'Special Elite', monospace;
+    font-size: 20px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ribbon-red);
+    border: 3px double var(--ribbon-red);
+    padding: 6px 14px;
+    transform: rotate(-4deg);
+    opacity: 0.92;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .stamp.appear { animation: stampIn 220ms ease-out both; }
+  @keyframes stampIn {
+    0%   { transform: rotate(-4deg) scale(1.6); opacity: 0; }
+    100% { transform: rotate(-4deg) scale(1);   opacity: 0.92; }
+  }
+
+  .answer {
+    font-size: 17px;
+    line-height: 1.85;
+    white-space: pre-wrap;
+    min-height: 32px;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.05em;
+    background: var(--ink);
+    vertical-align: text-bottom;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- Signals ---------- */
+  .signals { margin-top: 34px; display: none; }
+  .signals.visible { display: block; }
+
+  .signals-label {
+    font-size: 12px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+  }
+
+  .signal {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px dashed var(--rule);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .signal .date {
+    color: var(--ledger-blue);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .signal .src {
+    color: var(--ink-faint);
+    font-size: 12px;
+    display: block;
+    margin-top: 2px;
+  }
+
+  /* ---------- States ---------- */
+  .status {
+    margin-top: 56px;
+    font-size: 14px;
+    color: var(--ink-faint);
+    font-style: italic;
+    display: none;
+  }
+  .status.visible { display: block; }
+
+  footer {
+    margin-top: 80px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  @media (max-width: 520px) {
+    .signal { grid-template-columns: 1fr; gap: 2px; }
+    .dispatch-head { flex-direction: column-reverse; }
+    .stamp { align-self: flex-start; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cursor { animation: none; }
+    .stamp.appear { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header>
+    <div class="masthead">Kokum Wire</div>
+    <div class="dispatch-line">Semiconductor Supply Intelligence<span id="station-date"></span></div>
+    <hr class="rule" aria-hidden="true">
+  </header>
+
+  <main>
+    <div class="prompt-label">Ask the ledger</div>
+    <div class="ask-row">
+      <span class="caret-mark" aria-hidden="true">&gt;</span>
+      <input id="question" type="text"
+             placeholder="What's new?"
+             autocomplete="off" spellcheck="false"
+             aria-label="Ask what's new in the semiconductor supply chain">
+      <button class="send" id="send">Send</button>
+    </div>
+    <div class="ask-hint">Press <kbd>Enter</kbd> to transmit. Try: <em>what's new in automotive MCUs?</em></div>
+
+    <div class="status" id="status" role="status">connecting to ledger&hellip;</div>
+
+    <section class="dispatch" id="dispatch" aria-live="polite">
+      <div class="dispatch-head">
+        <div class="dispatch-meta" id="meta"></div>
+        <div class="stamp" id="stamp" hidden></div>
+      </div>
+      <div class="answer" id="answer"></div>
+      <div class="signals" id="signals">
+        <div class="signals-label">Evidence — dated at time of logging</div>
+        <div id="signal-rows"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Kokum Labs &bull; verdicts carry dates &bull; press releases don't count</footer>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG — Layer 2 plugs in here.
+   Leave API_URL null for demo mode (canned Magdeburg answer).
+   When your FastAPI endpoint is live, set e.g.:
+     const API_URL = "https://your-app.up.railway.app/ask";
+   Contract: POST {question: string}
+   Response: {
+     verdict: "WATCH" | "CONCERN" | "DOUBTFUL" | "CLEAR",
+     answer: string,
+     signals: [{date: "2023-04-27", text: "...", source: "Intel Q1'23 earnings call"}]
+   }
+   ========================================================= */
+const API_URL = "/ask";  // served by the FastAPI app; set to null for standalone demo mode
+
+/* ---------- Demo dispatch (Magdeburg backtest flavor) ---------- */
+const DEMO = {
+  verdict: "DOUBTFUL",
+  answer:
+"INTEL MAGDEBURG (FAB 29.x) — STATUS DOWNGRADED.\n\n" +
+"As of this date the ledger reads Magdeburg as DOUBTFUL. Capex guidance has been cut twice in three quarters while management language shifted from \"on schedule\" to \"subject to subsidy finalization.\" No corresponding equipment orders are visible in ASML or Applied Materials backlog commentary — a fab eighteen months from tooling should be placing them now. German subsidy negotiations remain open past their second deadline. Local hiring postings have flatlined since March.\n\n" +
+"Money and machines say this fab slips by years or dies quietly. Press releases say otherwise. We side with the machines.",
+  signals: [
+    { date: "2023-04-27", text: "FY capex guidance reduced; \"disciplined spending\" language introduced on Q1 call.", source: "Intel Q1 2023 earnings call" },
+    { date: "2023-06-14", text: "No Magdeburg-attributable orders in ASML backlog commentary for a second consecutive quarter.", source: "ASML investor update" },
+    { date: "2023-08-02", text: "German federal subsidy package still unsigned past revised deadline; scope renegotiation reported.", source: "Handelsblatt" },
+    { date: "2023-09-19", text: "Magdeburg-region Intel job postings down to single digits from 40+ in January.", source: "LinkedIn / StepStone listings" }
+  ],
+  as_of: "MID-2023 · BACKTEST MODE"
+};
+
+/* ---------- Elements ---------- */
+const $q = document.getElementById("question");
+const $send = document.getElementById("send");
+const $status = document.getElementById("status");
+const $dispatch = document.getElementById("dispatch");
+const $meta = document.getElementById("meta");
+const $stamp = document.getElementById("stamp");
+const $answer = document.getElementById("answer");
+const $signals = document.getElementById("signals");
+const $signalRows = document.getElementById("signal-rows");
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* Station date in masthead */
+(function () {
+  const d = new Date();
+  const fmt = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+  document.getElementById("station-date").textContent = " — " + fmt;
+})();
+
+/* ---------- Ask flow ---------- */
+async function ask() {
+  const question = $q.value.trim() || "What's new?";
+  setBusy(true);
+  resetDispatch();
+  $status.textContent = "connecting to ledger\u2026";
+  $status.classList.add("visible");
+
+  try {
+    const data = await fetchAnswer(question);
+    $status.classList.remove("visible");
+    renderDispatch(question, data);
+  } catch (err) {
+    $status.textContent =
+      "The ledger did not respond. Check that the API endpoint is reachable, then transmit again.";
+  } finally {
+    setBusy(false);
+  }
+}
+
+function setBusy(b) {
+  $send.disabled = b;
+  $q.disabled = b;
+}
+
+function resetDispatch() {
+  $dispatch.classList.remove("visible");
+  $signals.classList.remove("visible");
+  $stamp.hidden = true;
+  $stamp.classList.remove("appear");
+  $answer.textContent = "";
+  $signalRows.innerHTML = "";
+}
+
+async function fetchAnswer(question) {
+  if (!API_URL) {
+    // Demo mode: simulate wire latency, return canned dispatch.
+    await new Promise(r => setTimeout(r, 900));
+    return DEMO;
+  }
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question })
+  });
+  if (!res.ok) throw new Error("Bad response: " + res.status);
+  return res.json();
+}
+
+function renderDispatch(question, data) {
+  const now = new Date();
+  const stampDate = (data.as_of) ? data.as_of :
+    now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
+
+  $meta.innerHTML =
+    "RE: " + escapeHtml(question.toUpperCase()) + "<br>" +
+    "DISPATCH " + stampDate;
+
+  $dispatch.classList.add("visible");
+
+  typeOut(data.answer || "No entries in the ledger match this question yet. Scope it to a company, fab, or part family and transmit again.", () => {
+    // Stamp lands after the text finishes.
+    if (data.verdict) {
+      $stamp.textContent = data.verdict;
+      $stamp.hidden = false;
+      if (!reduceMotion) $stamp.classList.add("appear");
+    }
+    renderSignals(data.signals || []);
+  });
+}
+
+function typeOut(text, done) {
+  if (reduceMotion) {
+    $answer.textContent = text;
+    done();
+    return;
+  }
+  const cursor = document.createElement("span");
+  cursor.className = "cursor";
+  cursor.setAttribute("aria-hidden", "true");
+  $answer.textContent = "";
+  $answer.appendChild(cursor);
+
+  let i = 0;
+  const CHUNK = 3;           // characters per tick
+  const TICK = 16;           // ms per tick — brisk teletype, not a slog
+
+  (function step() {
+    if (i < text.length) {
+      cursor.insertAdjacentText("beforebegin", text.slice(i, i + CHUNK));
+      i += CHUNK;
+      setTimeout(step, TICK);
+    } else {
+      cursor.remove();
+      done();
+    }
+  })();
+}
+
+function renderSignals(list) {
+  if (!list.length) return;
+  for (const s of list) {
+    const row = document.createElement("div");
+    row.className = "signal";
+    const d = document.createElement("div");
+    d.className = "date";
+    d.textContent = s.date || "";
+    const t = document.createElement("div");
+    t.textContent = s.text || "";
+    if (s.source) {
+      const src = document.createElement("span");
+      src.className = "src";
+      src.textContent = "— " + s.source;
+      t.appendChild(src);
+    }
+    row.appendChild(d);
+    row.appendChild(t);
+    $signalRows.appendChild(row);
+  }
+  $signals.classList.add("visible");
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+/* ---------- Events ---------- */
+$send.addEventListener("click", ask);
+$q.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+$q.focus();
+</script>
+</body>
+</html>

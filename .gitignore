@@ -1,0 +1,21 @@
+# Local SQLite ledger — rebuilt on Railway (point DB_PATH at a volume)
+*.db
+ledger.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Secrets / local env
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
