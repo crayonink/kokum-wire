@@ -8,9 +8,16 @@ verdict_horizon (the date by which they can be scored true/false).
   verdict encoding (matches the app's severity->verdict logic):
     DOUBTFUL = 5, CONCERN = 4, WATCH = 3, INFO = 1-2
 
-!! SOURCES ARE AS-PROVIDED BY THE ANALYST AND NOT YET INDEPENDENTLY VERIFIED,
-   except row 6 (India OSAT), which was corroborated across multiple outlets.
-   Fill source_url on rows 1-5 with real links before demoing.
+Figures cross-checked against tier-1 sources on 2026-07-04 (TrendForce, Tom's
+Hardware, IDC, Micron, Phison, HP, Indian press). source_url is populated on
+every substantive row. Corrections applied vs the original analyst brief:
+  - Row 3: Micron figure set to its actual words 'half to two-thirds' (was
+    '55-60%'); unverified '40-week lead time' specific dropped.
+  - Row 4: IDC 16%/17% confirmed; HBM wafer ratio set to ~3-4x (was ~3x).
+  - Row 5: the ~35%-of-BOM stat is HP's disclosure (not Dell's); Dell/Cisco
+    kept as the dated price actions.
+  - Row 1: reworded to the verified 'buyers balking' behaviour; the early-peak
+    call is flagged as a contested minority view.
 
 Usage (PowerShell):
     $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
@@ -36,9 +43,9 @@ ROWS = [
         "entity": "DRAM/NAND cycle",
         "signal_type": "other",
         "severity": 3,
-        "note": "Possible cycle top forming: spot buyers stopped chasing quotes and NAND spot trading has gone quiet while contract prices stay green — strain showing in behaviour before price. Ackerman note now sees DRAM/NAND ASPs peaking mid-2026, falling from 2027 (a year earlier than his prior call).",
-        "source": "Spot-market read + contested Ackerman ASP note",
-        "source_url": "",
+        "note": "Possible cycle top forming: buyers starting to balk even as DRAM/NAND contract prices keep rising in mid-2026 — strain showing in behaviour before price. Contrarian read: a contested analyst call sees ASPs peaking mid-2026 and falling from 2027, against a mainstream view that prices hold up through 2027+.",
+        "source": "Spot/contract read (BuySellRam, mid-2026) + contested early-peak analyst call",
+        "source_url": "https://www.buysellram.com/blog/dram-nand-prices-mid-2026/",
         "tags": "dram,nand,cycle,inflection,spot,pricing",
         "verdict_horizon": "2026-07-27",
     },
@@ -49,8 +56,8 @@ ROWS = [
         "signal_type": "allocation",
         "severity": 4,
         "note": "NAND contract prices rising faster than DRAM for the first time this cycle (~70-75% vs ~58-63% QoQ in Q2), driven by enterprise-SSD demand from AI. eMMC/UFS faces the tightest gap — capacity overlaps enterprise SSD at worse margins, so it is lowest allocation priority; hits automotive/embedded buyers hardest.",
-        "source": "Q2 2026 contract price data (TrendForce)",
-        "source_url": "",
+        "source": "TrendForce Q2 2026 contract price data (via Tom's Hardware)",
+        "source_url": "https://www.tomshardware.com/pc-components/dram/dram-and-nand-contract-prices-to-climb-again-in-q2",
         "tags": "nand,emmc,ufs,ssd,allocation,automotive,embedded",
         "verdict_horizon": "2026-07-27",
     },
@@ -60,9 +67,9 @@ ROWS = [
         "entity": "DRAM allocation",
         "signal_type": "allocation",
         "severity": 4,
-        "note": "Micron can fulfil only ~55-60% of core-customer demand; suppliers locking hyperscalers into allocation-only frameworks that structurally disadvantage smaller buyers; DRAM lead times past 40 weeks. Phison CEO: every NAND maker says 2026 capacity is sold out.",
-        "source": "Micron disclosure; Phison CEO commentary",
-        "source_url": "",
+        "note": "Micron (FQ2 2026 call) can meet only 'half to two-thirds' of key-customer demand; expects supply short of demand beyond calendar 2026, with limited allocations and longer lead times hitting smaller/consumer buyers hardest. Phison CEO: 'every NAND manufacturer told us 2026 is sold out.'",
+        "source": "Micron FQ2 2026 earnings call (via Tom's Hardware); Phison CEO (Digitimes)",
+        "source_url": "https://www.tomshardware.com/pc-components/dram/micron-outlines-grim-outlook-for-dram-supply-in-first-earnings-call-since-killing-crucial-memory-and-ssd-brand-ceo-says-it-can-only-meet-half-to-two-thirds-of-demand",
         "tags": "dram,nand,allocation,leadtime,micron,phison,hyperscaler",
         "verdict_horizon": "2026-07-27",
     },
@@ -72,9 +79,9 @@ ROWS = [
         "entity": "DRAM/HBM supply",
         "signal_type": "other",
         "severity": 3,
-        "note": "Meaningful new capacity not expected until late 2027-2028. IDC projects 2026 supply growth of ~16% DRAM / ~17% NAND, below the 20-30% historical norm — a structural reallocation, not a cyclical shortage (HBM consumes ~3x wafer capacity per GB vs DDR5).",
-        "source": "IDC 2026 supply outlook",
-        "source_url": "",
+        "note": "Meaningful new capacity not expected until late 2027-2028. IDC projects 2026 bit-supply growth of ~16% DRAM / ~17% NAND, below the 20-30% historical norm — a structural reallocation, not a cyclical shortage (HBM consumes ~3-4x wafer capacity vs standard DDR5).",
+        "source": "IDC 2026 global memory shortage outlook",
+        "source_url": "https://www.idc.com/resource-center/blog/global-memory-shortage-crisis-market-analysis-and-the-potential-impact-on-the-smartphone-and-pc-markets-in-2026/",
         "tags": "dram,nand,hbm,capacity,structural,idc,ddr5",
         "verdict_horizon": "2027-12-31",
     },
@@ -84,9 +91,9 @@ ROWS = [
         "entity": "PC/server OEM pricing",
         "signal_type": "other",
         "severity": 3,
-        "note": "Cost pass-through propagating: Dell raised hardware prices +17% on 30 Mar 2026, Cisco raised compute prices 7 Mar 2026; memory now ~35% of PC build materials, up from ~20% a year ago. Evidence the fab->contract->OEM price chain propagates on a traceable lag.",
-        "source": "Dell (30 Mar 2026) & Cisco (7 Mar 2026) price actions",
-        "source_url": "",
+        "note": "Cost pass-through propagating: Dell raised commercial-PC/workstation prices effective 30 Mar 2026 (memory cost 'out of our control'), Cisco raised compute list prices effective 7 Mar 2026. HP says memory is now ~35% of its PC bill of materials, ~double a year ago. Evidence the fab->contract->OEM price chain propagates on a traceable lag.",
+        "source": "Dell (30 Mar 2026) & Cisco (7 Mar 2026) price actions; HP BOM disclosure",
+        "source_url": "https://www.pcgamer.com/hardware/memory/hp-warns-that-memory-now-makes-up-around-35-percent-of-the-cost-its-pcs-double-that-of-a-year-ago/",
         "tags": "dell,cisco,oem,pc,server,passthrough,pricing",
         "verdict_horizon": "",
     },
