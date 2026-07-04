@@ -232,6 +232,21 @@ logged by an analyst). Rules, absolute:
    The answer may use \\n\\n for paragraph breaks. 120-220 words."""
 
 
+# Structured-output schema — the API constrains the response to exactly this
+# shape, so the dispatch is guaranteed valid JSON with a valid verdict. This
+# removes the whole class of "LLM returned prose/fences -> json.loads fails ->
+# silent fallback" bugs. Supported on Sonnet 5 / Opus 4.8 / Haiku 4.5.
+VERDICT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"type": "string", "enum": VERDICTS},
+        "answer": {"type": "string"},
+    },
+    "required": ["verdict", "answer"],
+    "additionalProperties": False,
+}
+
+
 def compose_with_claude(question: str, signals: list[dict]) -> dict:
     import anthropic
 
@@ -242,9 +257,9 @@ def compose_with_claude(question: str, signals: list[dict]) -> dict:
         for s in signals
     )
     q = question or "What's new?"
-    msg = client.messages.create(
+    kwargs = dict(
         model=MODEL,
-        max_tokens=1000,
+        max_tokens=1500,
         system=SYSTEM_PROMPT,
         messages=[
             {
@@ -253,12 +268,23 @@ def compose_with_claude(question: str, signals: list[dict]) -> dict:
             }
         ],
     )
+    try:
+        msg = client.messages.create(
+            **kwargs,
+            output_config={"format": {"type": "json_schema", "schema": VERDICT_SCHEMA}},
+        )
+    except anthropic.BadRequestError:
+        # A KOKUM_MODEL that doesn't support structured outputs rejects
+        # output_config with a 400 — retry plain and rely on tolerant parsing.
+        msg = client.messages.create(**kwargs)
     text = "".join(b.text for b in msg.content if b.type == "text").strip()
+    # With structured outputs this is already clean JSON; the fence/preamble
+    # tolerance stays as a belt-and-suspenders guard for any model that ignores
+    # output_config (e.g. an older KOKUM_MODEL override).
     text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.S).strip()
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        # Tolerate a stray preamble/suffix: pull the outermost JSON object.
         m = re.search(r"\{.*\}", text, re.S)
         if not m:
             raise
