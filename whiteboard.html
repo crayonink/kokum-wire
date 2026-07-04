@@ -255,10 +255,85 @@
     color: var(--ink-faint);
   }
 
+  /* ---------- Decision desk (buy now vs. later) ---------- */
+  .desk-divider { margin-top: 72px; }
+
+  .decide-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 18px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.part { flex: 1 1 240px; }
+  .field-label {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .field input {
+    font-family: 'Courier Prime', monospace;
+    font-size: 18px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    padding: 6px 2px 8px;
+    outline: none;
+    border-radius: 0;
+    width: 100%;
+  }
+  .field.num input { width: 120px; }
+  .field input:focus-visible { border-bottom: 2px solid var(--ribbon-red); }
+
+  .decision { margin-top: 44px; display: none; }
+  .decision.visible { display: block; }
+
+  .decision-headline {
+    font-family: 'Special Elite', 'Courier Prime', monospace;
+    font-size: clamp(18px, 3.6vw, 25px);
+    line-height: 1.4;
+    margin-bottom: 20px;
+  }
+
+  .actions { display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
+  .action {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 14px;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .action-tag {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+    font-weight: 700;
+    padding-top: 2px;
+  }
+
+  .rationale { margin: 6px 0 0; padding-left: 20px; }
+  .rationale li {
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .rationale li:last-child { border-bottom: 0; }
+
+  /* Urgency stamp variants (base .stamp is ribbon-red) */
+  .stamp.high   { opacity: 0.8; }
+  .stamp.medium { color: var(--ledger-blue); border-color: var(--ledger-blue); }
+  .stamp.low    { color: var(--ink-faint);  border-color: var(--ink-faint); opacity: 0.7; }
+
   @media (max-width: 520px) {
     .signal { grid-template-columns: 1fr; gap: 2px; }
+    .action { grid-template-columns: 1fr; gap: 2px; }
     .dispatch-head { flex-direction: column-reverse; }
     .stamp { align-self: flex-start; }
+    .field.num input { width: 100%; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -300,6 +375,52 @@
       <div class="signals" id="signals">
         <div class="signals-label">Evidence — dated at time of logging</div>
         <div id="signal-rows"></div>
+      </div>
+    </section>
+
+    <hr class="rule desk-divider" aria-hidden="true">
+
+    <div class="prompt-label" style="margin-top:40px">Decision desk — buy now or later</div>
+    <div class="decide-form">
+      <label class="field part">
+        <span class="field-label">Part class</span>
+        <input id="d-part" type="text" value="eMMC/UFS automotive"
+               autocomplete="off" spellcheck="false"
+               aria-label="Part class, e.g. eMMC/UFS automotive">
+      </label>
+      <label class="field num">
+        <span class="field-label">Units / month</span>
+        <input id="d-vol" type="number" min="0" step="1000" value="50000"
+               aria-label="Monthly volume in units">
+      </label>
+      <label class="field num">
+        <span class="field-label">Months of cover</span>
+        <input id="d-cov" type="number" min="0" step="0.5" value="2"
+               aria-label="Months of inventory plus contracted supply">
+      </label>
+      <button class="send" id="decide">Decide</button>
+    </div>
+    <div class="ask-hint">Months of cover = inventory + contracted supply on hand. The desk reconciles allocation and price timing from the dated ledger — no black box.</div>
+
+    <div class="status" id="d-status" role="status">running the rules&hellip;</div>
+
+    <section class="decision" id="decision" aria-live="polite">
+      <div class="dispatch-head">
+        <div class="dispatch-meta" id="d-meta"></div>
+        <div class="stamp" id="d-stamp" hidden></div>
+      </div>
+      <div class="decision-headline" id="d-headline"></div>
+      <div class="actions">
+        <div class="action"><span class="action-tag">Allocation</span><span id="d-alloc"></span></div>
+        <div class="action"><span class="action-tag">Price</span><span id="d-price"></span></div>
+      </div>
+      <div class="signals" id="d-why">
+        <div class="signals-label">Why — every line dated &amp; sourced</div>
+        <ol class="rationale" id="d-rationale"></ol>
+      </div>
+      <div class="signals" id="d-evidence-wrap">
+        <div class="signals-label">Evidence — the ledger rows behind the call</div>
+        <div id="d-evidence"></div>
       </div>
     </section>
   </main>
@@ -486,9 +607,134 @@ function escapeHtml(s) {
   }[c]));
 }
 
+/* ---------- Decision desk ---------- */
+const DECIDE_URL = "/decide";  // FastAPI /decide; rule-based buy-now-vs-later
+
+const $dPart = document.getElementById("d-part");
+const $dVol = document.getElementById("d-vol");
+const $dCov = document.getElementById("d-cov");
+const $decideBtn = document.getElementById("decide");
+const $dStatus = document.getElementById("d-status");
+const $decision = document.getElementById("decision");
+const $dMeta = document.getElementById("d-meta");
+const $dStamp = document.getElementById("d-stamp");
+const $dHeadline = document.getElementById("d-headline");
+const $dAlloc = document.getElementById("d-alloc");
+const $dPrice = document.getElementById("d-price");
+const $dWhy = document.getElementById("d-why");
+const $dRationale = document.getElementById("d-rationale");
+const $dEvidenceWrap = document.getElementById("d-evidence-wrap");
+const $dEvidence = document.getElementById("d-evidence");
+
+async function decide() {
+  const part_class = $dPart.value.trim();
+  if (!part_class) { $dPart.focus(); return; }
+  const monthly_volume = Math.max(0, parseInt($dVol.value || "0", 10) || 0);
+  const coverage_months = Math.max(0, parseFloat($dCov.value || "0") || 0);
+
+  setDeciding(true);
+  resetDecision();
+  $dStatus.textContent = "running the rules…";
+  $dStatus.classList.add("visible");
+
+  try {
+    const res = await fetch(DECIDE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ part_class, monthly_volume, coverage_months })
+    });
+    if (!res.ok) throw new Error("Bad response: " + res.status);
+    const data = await res.json();
+    $dStatus.classList.remove("visible");
+    renderDecision(data);
+  } catch (err) {
+    $dStatus.textContent =
+      "The decision desk did not respond. Check that the API endpoint is reachable, then try again.";
+  } finally {
+    setDeciding(false);
+  }
+}
+
+function setDeciding(b) {
+  $decideBtn.disabled = b;
+  $dPart.disabled = b; $dVol.disabled = b; $dCov.disabled = b;
+}
+
+function resetDecision() {
+  $decision.classList.remove("visible");
+  $dStamp.hidden = true;
+  $dStamp.className = "stamp";
+  $dRationale.innerHTML = "";
+  $dEvidence.innerHTML = "";
+}
+
+function renderDecision(d) {
+  $dMeta.innerHTML =
+    "RE: " + escapeHtml((d.part_class || "").toUpperCase()) + "<br>" +
+    "DECISION " + escapeHtml(d.as_of || "");
+  $dHeadline.textContent = d.headline || "";
+  $dAlloc.textContent = d.allocation_action || "";
+  $dPrice.textContent = d.price_action || "";
+
+  const u = (d.urgency || "low").toString();
+  $dStamp.className = "stamp " + u.toLowerCase();
+  $dStamp.textContent = u.toUpperCase();
+  $dStamp.hidden = false;
+  if (!reduceMotion) $dStamp.classList.add("appear");
+
+  const rats = d.rationale || [];
+  $dRationale.innerHTML = "";
+  for (const line of rats) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    $dRationale.appendChild(li);
+  }
+  $dWhy.classList.toggle("visible", rats.length > 0);
+
+  const ev = d.evidence || [];
+  $dEvidence.innerHTML = "";
+  for (const s of ev) {
+    const row = document.createElement("div");
+    row.className = "signal";
+    const dt = document.createElement("div");
+    dt.className = "date";
+    dt.textContent = s.date || "";
+    const t = document.createElement("div");
+    t.textContent = (s.entity ? s.entity + " — " : "") + (s.text || "");
+    if (s.source) {
+      const src = document.createElement("span");
+      src.className = "src";
+      if (s.source_url) {
+        const a = document.createElement("a");
+        a.href = s.source_url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = "— " + s.source;
+        a.style.color = "inherit";
+        src.appendChild(a);
+      } else {
+        src.textContent = "— " + s.source;
+      }
+      t.appendChild(src);
+    }
+    row.appendChild(dt);
+    row.appendChild(t);
+    $dEvidence.appendChild(row);
+  }
+  $dEvidenceWrap.classList.toggle("visible", ev.length > 0);
+
+  $decision.classList.add("visible");
+}
+
 /* ---------- Events ---------- */
 $send.addEventListener("click", ask);
 $q.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+
+$decideBtn.addEventListener("click", decide);
+for (const el of [$dPart, $dVol, $dCov]) {
+  el.addEventListener("keydown", e => { if (e.key === "Enter") decide(); });
+}
+
 $q.focus();
 </script>
 </body>
