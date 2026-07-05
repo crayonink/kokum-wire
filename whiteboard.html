@@ -142,8 +142,9 @@
     user-select: none;
   }
 
-  #question {
+  .ask-row input[type="text"] {
     flex: 1;
+    min-width: 0;
     font-family: 'Courier Prime', monospace;
     font-size: 20px;
     color: var(--ink);
@@ -154,8 +155,8 @@
     outline: none;
     border-radius: 0;
   }
-  #question::placeholder { color: var(--ink-faint); opacity: 0.8; font-style: italic; }
-  #question:focus-visible { border-bottom: 2px solid var(--ribbon-red); }
+  .ask-row input[type="text"]::placeholder { color: var(--ink-faint); opacity: 0.8; font-style: italic; }
+  .ask-row input[type="text"]:focus-visible { border-bottom: 2px solid var(--ribbon-red); }
 
   .ask-hint {
     margin-top: 10px;
