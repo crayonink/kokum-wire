@@ -149,6 +149,13 @@ class SynthesizeIn(BaseModel):
     question: str = ""
 
 
+class RetagRow(BaseModel):
+    entity: str
+    device_type: str = ""
+    affected_industries: str = ""
+    region: str = ""
+
+
 def insert_signal(s: SignalIn) -> int:
     with db() as conn:
         cur = conn.execute(
@@ -842,6 +849,28 @@ def list_signals(q: str = "", device: str = "", industry: str = "",
                  region: str = "", limit: int = 50):
     rows = filter_rows(retrieve(q, limit=200), device, industry, region)
     return {"signals": rows[:min(limit, 200)]}
+
+
+@app.post("/admin/retag")
+def retag(rows: list[RetagRow], x_ledger_key: str = Header(default="")):
+    """Keyed, idempotent taxonomy backfill: set device_type / affected_industries
+    / region on existing rows by exact entity match — for upgrading rows logged
+    before those fields existed. Only touches the taxonomy columns; logged_at and
+    all signal content are preserved. Safe to re-run."""
+    if x_ledger_key != WRITE_KEY:
+        raise HTTPException(status_code=401, detail="Bad ledger key.")
+    updated = {}
+    with db() as conn:
+        for r in rows:
+            cur = conn.execute(
+                "UPDATE signals SET device_type=?, affected_industries=?, region=? "
+                "WHERE entity=?",
+                (r.device_type.strip(), r.affected_industries.strip(),
+                 r.region.strip(), r.entity.strip()),
+            )
+            if cur.rowcount:
+                updated[r.entity] = cur.rowcount
+    return {"updated": updated, "rows_updated": sum(updated.values())}
 
 
 @app.get("/health")
