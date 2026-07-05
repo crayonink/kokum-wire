@@ -239,9 +239,11 @@ logged by an analyst). Rules, absolute:
 2. Cite the observed date of every claim inline, e.g. (27 Apr 2023).
 3. If the signals do not cover the question, say plainly that the ledger has
    no entries on it yet — do not improvise.
-4. Voice: terse wire-dispatch style. Short declarative sentences. Lead with
-   the verdict-relevant facts. No pleasantries, no hedging filler. Plain
-   words a commodity manager respects.
+4. Voice: plain, direct business English. Clear, complete sentences a
+   non-expert can read instantly. Lead with the conclusion. Prefer common
+   words over jargon; when a domain term is unavoidable (e.g. allocation),
+   use it inside a plain sentence. No telegram style, no dramatic flourishes,
+   no hedging filler.
 5. Choose ONE verdict for the question's subject:
    CLEAR (no adverse signals), WATCH (early smoke), CONCERN (multiple
    corroborating adverse signals), DOUBTFUL (evidence points to disruption,
@@ -329,8 +331,8 @@ def compose_fallback(question: str, signals: list[dict]) -> dict:
     if not signals:
         return {
             "verdict": "CLEAR",
-            "answer": "The ledger has no entries matching this question yet. "
-            "Scope it to a company, fab, or part family and transmit again.",
+            "answer": "The ledger has no entries on this yet. Try a company, "
+            "fab, or part family, and ask again.",
         }
     max_sev = max(s["severity"] for s in signals)
     verdict = (
@@ -379,8 +381,9 @@ Rules, absolute:
 3. If the signals do not support a genuine multi-signal insight, return an EMPTY
    list. Do not manufacture connections to fill space — fewer real insights beat
    many shallow ones. Cap at 4.
-4. Each claim is one or two plain, specific sentences a commodity manager can act
-   on. Lead with the conclusion.
+4. Each claim is one or two sentences of plain, direct business English a
+   non-expert can act on. Lead with the conclusion; prefer common words over
+   jargon.
 
 Reply with ONLY JSON:
 {"insights":[{"claim":"...","insight_type":"...","signal_numbers":[1,4]}]}"""
@@ -574,10 +577,10 @@ def decide_buy_timing(part_class: str, monthly_volume: int,
     if not part_rows or (allocation_risk == 0 and not top_rows and not struct_rows):
         return {
             "part_class": part_class, "verdict": "CLEAR", "urgency": "LOW",
-            "headline": "No signal on the ledger for this part class yet — "
-                        "scope it to a memory part family the ledger tracks "
-                        "(DRAM, NAND, eMMC/UFS), or log signals for it first.",
-            "allocation_action": "Log signals for this part class, then re-run.",
+            "headline": "The ledger doesn't track this part yet. Try a memory "
+                        "part it does cover (DRAM, NAND, eMMC/UFS), or add "
+                        "signals for it first.",
+            "allocation_action": "Add signals for this part, then run it again.",
             "price_action": "—",
             "coverage_target_months": 0, "coverage_gap_months": 0,
             "rationale": [], "evidence": [],
@@ -602,66 +605,66 @@ def decide_buy_timing(part_class: str, monthly_volume: int,
         urgency = "LOW"
 
     if allocation_risk >= 4:
-        allocation_action = ("Lock allocation now — contract the fullest "
-                             "volume and tenor you can secure.")
+        allocation_action = ("Secure your supply now. Sign contracts for as much "
+                             "volume, and as far into the future, as you can.")
     elif allocation_risk == 3:
-        allocation_action = ("Start locking allocation this quarter — the "
-                             "market is tightening.")
+        allocation_action = ("Start securing supply this quarter — the market is "
+                             "tightening.")
     else:
-        allocation_action = "No allocation pressure — standard procurement cadence."
+        allocation_action = "No supply pressure — buy on your normal schedule."
 
     if price_top:
-        price_action = ("Keep price exposure SHORT — prefer index-linked or "
-                        "short-tenor terms over long fixed prices. A contested "
-                        "cycle-top call is live.")
+        price_action = ("Keep prices flexible. Use short contracts or prices that "
+                        "track the market, not long fixed-price deals — there's a "
+                        "real chance prices are near their peak.")
     else:
-        price_action = "Standard price terms — no cycle-top signal on the ledger."
+        price_action = "Normal price terms — nothing suggests prices are about to fall."
 
     if allocation_risk >= 4 and price_top:
-        headline = "Lock allocation now; keep price exposure short."
+        headline = "Secure supply now; keep prices flexible."
     elif allocation_risk >= 4:
-        headline = "Lock allocation now."
+        headline = "Secure your supply now."
     elif allocation_risk == 3 and price_top:
-        headline = "Begin locking allocation; keep price exposure short."
+        headline = "Start securing supply; keep prices flexible."
     elif price_top:
-        headline = "No allocation pressure; keep price exposure short."
+        headline = "No supply pressure; keep prices flexible."
     else:
-        headline = "Standard cadence — no urgent timing signal."
+        headline = "No urgent timing signal — buy on your normal schedule."
 
     # Rationale — each line traced to a real dated row.
     rationale, used = [], []
     if alloc_rows:
         r = max(alloc_rows, key=lambda x: x["severity"])
-        rationale.append(f"2026 supply is allocated (severity {r['severity']}/5): "
-                         f"{r['note']} ({_cite(r)}).")
+        rationale.append("2026 supply is already committed to other buyers "
+                         f"(severity {r['severity']}/5): {r['note']} ({_cite(r)}).")
         used.append(r)
     if part_flag and part_flag["id"] not in {u["id"] for u in used}:
-        rationale.append("Your part class sits in the tightest segment: "
+        rationale.append("Your part is in the hardest-hit group: "
                          f"{part_flag['note']} ({_cite(part_flag)}).")
         used.append(part_flag)
     if price_top:
         r = max(top_rows, key=lambda x: x["severity"])
-        rationale.append("But a cycle top may be forming — reason not to lock "
-                         f"long fixed prices: {r['note']} ({_cite(r)}).")
+        rationale.append("But prices may be near their peak — a reason not to lock "
+                         f"in long fixed prices: {r['note']} ({_cite(r)}).")
         used.append(r)
     if struct_rows:
         r = struct_rows[0]
-        rationale.append(f"The squeeze is structural, not a blip: {r['note']} "
+        rationale.append(f"This shortage is long-term, not a brief dip: {r['note']} "
                          f"({_cite(r)}).")
         used.append(r)
     if coverage_months is not None:
-        line = f"You hold {coverage_months:g} months of cover"
+        line = f"You have {coverage_months:g} months of supply on hand"
         if monthly_volume:
             line += f" (~{buffer_units:,} units)"
-        line += f" against a prudent {target_cover}-month buffer for this risk level"
+        line += f". For this level of risk, {target_cover} months is a safer cushion"
         if gap_months > 0:
-            line += f" — a {gap_months:g}-month"
+            line += f" — you're short by about {gap_months:g} months"
             if monthly_volume:
-                line += f" / ~{gap_units:,}-unit"
-            line += " shortfall to close."
+                line += f" (~{gap_units:,} units)"
+            line += "."
         else:
-            line += (" — near-term cover is adequate, but allocation must "
-                     "still be secured ahead of the sold-out window.")
+            line += (" — your near-term supply is fine, but you should still lock "
+                     "in future supply before it's all committed.")
         rationale.append(line)
 
     seen, evidence = set(), []
@@ -740,11 +743,11 @@ def synthesize(body: SynthesizeIn):
     base = {"question": body.question, "insights": [], "dropped": 0,
             "signals_considered": len(signals), "as_of": as_of}
     if len(signals) < 2:
-        return {**base, "note": "Need at least two related signals to synthesize "
-                                "across. Broaden the question."}
+        return {**base, "note": "Need at least two related signals to find a "
+                                "connection. Try a broader question."}
     if not ANTHROPIC_API_KEY:
-        return {**base, "note": "Synthesis is genuine reasoning — it requires the "
-                                "LLM. Set ANTHROPIC_API_KEY."}
+        return {**base, "note": "Finding connections needs the AI model. "
+                                "Set ANTHROPIC_API_KEY."}
     try:
         raw = synthesize_insights(body.question, signals)
     except Exception as e:
@@ -753,8 +756,8 @@ def synthesize(body: SynthesizeIn):
     grounded, dropped = ground_insights(raw, signals)
     note = None
     if not grounded:
-        note = ("No multi-signal insight the evidence supports — the ledger's "
-                "rows on this don't yet connect into one.")
+        note = ("No connection the evidence supports yet — the rows on this "
+                "don't join up into a single insight.")
     return {**base, "insights": grounded, "dropped": dropped, "note": note}
 
 
