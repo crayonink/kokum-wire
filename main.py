@@ -239,11 +239,12 @@ logged by an analyst). Rules, absolute:
 2. Cite the observed date of every claim inline, e.g. (27 Apr 2023).
 3. If the signals do not cover the question, say plainly that the ledger has
    no entries on it yet — do not improvise.
-4. Voice: plain, direct business English. Clear, complete sentences a
-   non-expert can read instantly. Lead with the conclusion. Prefer common
-   words over jargon; when a domain term is unavoidable (e.g. allocation),
-   use it inside a plain sentence. No telegram style, no dramatic flourishes,
-   no hedging filler.
+4. Voice: plain, direct business English — detailed and explanatory. Spell out
+   the reasoning behind each point, not just the conclusion: state the takeaway,
+   then explain why the signals support it. Clear, complete sentences a
+   non-expert can follow. Prefer common words over jargon; when a domain term is
+   unavoidable (e.g. allocation), explain it in plain words. No telegram style,
+   no dramatic flourishes, no hedging filler.
 5. Choose ONE verdict for the question's subject:
    CLEAR (no adverse signals), WATCH (early smoke), CONCERN (multiple
    corroborating adverse signals), DOUBTFUL (evidence points to disruption,
@@ -381,9 +382,10 @@ Rules, absolute:
 3. If the signals do not support a genuine multi-signal insight, return an EMPTY
    list. Do not manufacture connections to fill space — fewer real insights beat
    many shallow ones. Cap at 4.
-4. Each claim is one or two sentences of plain, direct business English a
-   non-expert can act on. Lead with the conclusion; prefer common words over
-   jargon.
+4. Each claim is plain, direct business English that spells out HOW the combined
+   signals lead to the conclusion: state the conclusion first, then the reasoning
+   that connects the cited signals. Two to four sentences; prefer common words
+   over jargon.
 
 Reply with ONLY JSON:
 {"insights":[{"claim":"...","insight_type":"...","signal_numbers":[1,4]}]}"""
@@ -605,20 +607,27 @@ def decide_buy_timing(part_class: str, monthly_volume: int,
         urgency = "LOW"
 
     if allocation_risk >= 4:
-        allocation_action = ("Secure your supply now. Sign contracts for as much "
-                             "volume, and as far into the future, as you can.")
+        allocation_action = ("Secure your supply now by contracting as much "
+                             "volume, and as long a term, as you can. The supply "
+                             "the ledger tracks is already committed to other "
+                             "buyers, so waiting means smaller allocations and "
+                             "longer lead times.")
     elif allocation_risk == 3:
-        allocation_action = ("Start securing supply this quarter — the market is "
-                             "tightening.")
+        allocation_action = ("Start securing supply this quarter. The market is "
+                             "tightening, and locking terms now — before it turns "
+                             "fully committed — protects your volume.")
     else:
-        allocation_action = "No supply pressure — buy on your normal schedule."
+        allocation_action = ("No supply pressure right now, so you can buy on your "
+                             "normal schedule rather than committing early.")
 
     if price_top:
-        price_action = ("Keep prices flexible. Use short contracts or prices that "
-                        "track the market, not long fixed-price deals — there's a "
-                        "real chance prices are near their peak.")
+        price_action = ("Avoid long fixed-price deals. A credible signal suggests "
+                        "prices may be near their peak, so keeping terms short or "
+                        "market-linked protects you if they fall from here.")
     else:
-        price_action = "Normal price terms — nothing suggests prices are about to fall."
+        price_action = ("Normal price terms are fine — nothing on the ledger "
+                        "suggests prices are about to fall, so there's no need to "
+                        "keep terms unusually short.")
 
     if allocation_risk >= 4 and price_top:
         headline = "Secure supply now; keep prices flexible."
