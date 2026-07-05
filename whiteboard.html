@@ -211,6 +211,20 @@
     line-height: 1.9;
   }
 
+  .head-right { display: flex; align-items: flex-start; gap: 12px; }
+  .close-x {
+    background: transparent;
+    border: 0;
+    font-family: 'Courier Prime', monospace;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--ink-faint);
+    cursor: pointer;
+    padding: 0 2px;
+  }
+  .close-x:hover { color: var(--ribbon-red); }
+  .close-x:focus-visible { outline: 2px solid var(--ribbon-red); outline-offset: 2px; }
+
   .stamp {
     font-family: 'Special Elite', monospace;
     font-size: 20px;
@@ -460,7 +474,10 @@
     <section class="dispatch" id="dispatch" aria-live="polite">
       <div class="dispatch-head">
         <div class="dispatch-meta" id="meta"></div>
-        <div class="stamp" id="stamp" hidden></div>
+        <div class="head-right">
+          <div class="stamp" id="stamp" hidden></div>
+          <button class="close-x" id="close-dispatch" type="button" aria-label="Close this dispatch">&times;</button>
+        </div>
       </div>
       <div class="answer" id="answer"></div>
       <div class="signals" id="signals">
@@ -488,7 +505,10 @@
     <section class="synthesis" id="synthesis" aria-live="polite">
       <div class="dispatch-head">
         <div class="dispatch-meta" id="s-meta"></div>
-        <div class="synth-guard" id="s-guard" hidden></div>
+        <div class="head-right">
+          <div class="synth-guard" id="s-guard" hidden></div>
+          <button class="close-x" id="close-synth" type="button" aria-label="Close this synthesis">&times;</button>
+        </div>
       </div>
       <div id="s-insights"></div>
       <div class="synth-note" id="s-note" hidden></div>
@@ -523,7 +543,10 @@
     <section class="decision" id="decision" aria-live="polite">
       <div class="dispatch-head">
         <div class="dispatch-meta" id="d-meta"></div>
-        <div class="stamp" id="d-stamp" hidden></div>
+        <div class="head-right">
+          <div class="stamp" id="d-stamp" hidden></div>
+          <button class="close-x" id="close-decision" type="button" aria-label="Close this decision">&times;</button>
+        </div>
       </div>
       <div class="decision-headline" id="d-headline"></div>
       <div class="actions">
@@ -975,6 +998,11 @@ $decideBtn.addEventListener("click", decide);
 for (const el of [$dPart, $dVol, $dCov]) {
   el.addEventListener("keydown", e => { if (e.key === "Enter") decide(); });
 }
+
+/* Close (×) buttons — dismiss a panel after reading, refocus its input. */
+document.getElementById("close-dispatch").addEventListener("click", () => { resetDispatch(); $q.focus(); });
+document.getElementById("close-synth").addEventListener("click", () => { resetSynth(); $sQ.focus(); });
+document.getElementById("close-decision").addEventListener("click", () => { resetDecision(); $dPart.focus(); });
 
 $q.focus();
 </script>
