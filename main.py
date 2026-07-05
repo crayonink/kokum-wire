@@ -522,6 +522,9 @@ def ground_insights(raw_insights: list[dict],
             "text": signals[x - 1]["note"],
             "source": signals[x - 1]["source"],
             "source_url": signals[x - 1].get("source_url", ""),
+            "device_type": signals[x - 1]["device_type"],
+            "affected_industries": signals[x - 1]["affected_industries"],
+            "region": signals[x - 1]["region"],
         } for x in nums]
         grounded.append({
             "claim": claim,
@@ -717,6 +720,8 @@ def decide_buy_timing(part_class: str, monthly_volume: int,
             "date": r["observed_date"], "entity": r["entity"],
             "text": r["note"], "source": r["source"],
             "source_url": r.get("source_url", ""), "horizon": r["verdict_horizon"],
+            "device_type": r["device_type"],
+            "affected_industries": r["affected_industries"], "region": r["region"],
         })
 
     return {
@@ -767,6 +772,7 @@ def ask(body: AskIn):
         "signals": [
             {
                 "date": fmt_date(s["observed_date"]),
+                "entity": s["entity"],
                 "text": s["note"],
                 "source": s["source"],
                 "horizon": s["verdict_horizon"],

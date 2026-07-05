@@ -296,6 +296,17 @@
     margin-top: 2px;
   }
 
+  .signal-tags { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--ledger-blue);
+    border: 1px solid var(--rule);
+    padding: 1px 7px;
+    white-space: nowrap;
+  }
+  .tag.company { color: var(--ink); font-weight: 700; border-color: var(--ink); }
+
   /* ---------- States ---------- */
   .status {
     margin-top: 56px;
@@ -733,6 +744,7 @@ function renderSignals(list) {
       src.textContent = "— " + s.source;
       t.appendChild(src);
     }
+    appendTags(t, s);
     row.appendChild(d);
     row.appendChild(t);
     $signalRows.appendChild(row);
@@ -744,6 +756,26 @@ function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   }[c]));
+}
+
+/* Company + taxonomy chips (device / industry / region) for an evidence row. */
+function appendTags(cell, s) {
+  const fields = [
+    ["company", s.entity],
+    ["", s.device_type],
+    ["", s.affected_industries],
+    ["", s.region],
+  ].filter(([, v]) => v);
+  if (!fields.length) return;
+  const wrap = document.createElement("div");
+  wrap.className = "signal-tags";
+  for (const [cls, v] of fields) {
+    const el = document.createElement("span");
+    el.className = "tag" + (cls ? " " + cls : "");
+    el.textContent = v.replace(/,/g, ", ");
+    wrap.appendChild(el);
+  }
+  cell.appendChild(wrap);
 }
 
 /* ---------- Decision desk ---------- */
@@ -839,7 +871,7 @@ function renderDecision(d) {
     dt.className = "date";
     dt.textContent = s.date || "";
     const t = document.createElement("div");
-    t.textContent = (s.entity ? s.entity + " — " : "") + (s.text || "");
+    t.textContent = s.text || "";
     if (s.source) {
       const src = document.createElement("span");
       src.className = "src";
@@ -856,6 +888,7 @@ function renderDecision(d) {
       }
       t.appendChild(src);
     }
+    appendTags(t, s);
     row.appendChild(dt);
     row.appendChild(t);
     $dEvidence.appendChild(row);
@@ -953,7 +986,7 @@ function renderSynthesis(question, data) {
         dt.className = "date";
         dt.textContent = s.date || "";
         const t = document.createElement("div");
-        t.textContent = (s.entity ? s.entity + " — " : "") + (s.text || "");
+        t.textContent = s.text || "";
         if (s.source) {
           const src = document.createElement("span");
           src.className = "src";
@@ -970,6 +1003,7 @@ function renderSynthesis(question, data) {
           }
           t.appendChild(src);
         }
+        appendTags(t, s);
         row.appendChild(dt);
         row.appendChild(t);
         wrap.appendChild(row);
