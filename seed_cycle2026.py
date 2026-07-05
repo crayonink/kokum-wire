@@ -49,7 +49,8 @@ ROWS = [
         "tags": "dram,nand,cycle,inflection,spot,pricing",
         "verdict_horizon": "2026-07-27",
         "device_type": "DRAM,NAND",
-        "affected_industries": "automotive,industrial,consumer,datacenter",
+        "affected_industries": "Automotive,Industrial,Consumer,Computing",
+        "region": "Americas,EMEA,APAC",
     },
     # 2 — NAND overtakes DRAM (CONCERN for flash buyers).
     {
@@ -63,7 +64,8 @@ ROWS = [
         "tags": "nand,emmc,ufs,ssd,allocation,automotive,embedded",
         "verdict_horizon": "2026-07-27",
         "device_type": "NAND,eMMC/UFS",
-        "affected_industries": "automotive,industrial",
+        "affected_industries": "Automotive,Industrial",
+        "region": "Americas,EMEA,APAC",
     },
     # 3 — allocation lockout (CONCERN for small/mid buyers).
     {
@@ -77,7 +79,8 @@ ROWS = [
         "tags": "dram,nand,allocation,leadtime,micron,phison,hyperscaler",
         "verdict_horizon": "2026-07-27",
         "device_type": "DRAM,NAND",
-        "affected_industries": "automotive,industrial,consumer,datacenter",
+        "affected_industries": "Automotive,Industrial,Consumer,Computing",
+        "region": "Americas,APAC",
     },
     # 4 — supply relief date (structural, log once).
     {
@@ -91,7 +94,8 @@ ROWS = [
         "tags": "dram,nand,hbm,capacity,structural,idc,ddr5",
         "verdict_horizon": "2027-12-31",
         "device_type": "DRAM,HBM,NAND",
-        "affected_industries": "datacenter,automotive,industrial",
+        "affected_industries": "Computing,Automotive,Industrial",
+        "region": "Americas,EMEA,APAC",
     },
     # 5 — cost pass-through propagation (confirmed downstream impact).
     {
@@ -105,7 +109,8 @@ ROWS = [
         "tags": "dell,cisco,oem,pc,server,passthrough,pricing",
         "verdict_horizon": "",
         "device_type": "DRAM,NAND",
-        "affected_industries": "pc,datacenter",
+        "affected_industries": "Computing",
+        "region": "Americas",
     },
     # 6 — India OSAT capacity (INFO, capacity-side). Corroborated.
     {
@@ -119,7 +124,8 @@ ROWS = [
         "tags": "india,osat,packaging,test,subsidy,capacity",
         "verdict_horizon": "",
         "device_type": "",
-        "affected_industries": "automotive,industrial,consumer",
+        "affected_industries": "Automotive,Industrial,Consumer",
+        "region": "APAC",
     },
     # 7 — Vietnam MPW center (INFO, low priority; ecosystem only).
     {
@@ -134,6 +140,7 @@ ROWS = [
         "verdict_horizon": "",
         "device_type": "",
         "affected_industries": "",
+        "region": "APAC",
     },
 ]
 

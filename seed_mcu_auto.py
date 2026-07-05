@@ -48,8 +48,9 @@ ROWS = [
         "source_url": "https://www.stocktitan.net/sec-filings/NXPI/8-k-nxp-semiconductors-n-v-reports-material-event-86c628442e79.html",
         "tags": "nxp,mcu,microcontroller,s32,automotive,sdv,zonal,radar",
         "verdict_horizon": "",
-        "device_type": "MCU,logic",
-        "affected_industries": "automotive,industrial",
+        "device_type": "MCU,Logic",
+        "affected_industries": "Automotive,Industrial",
+        "region": "EMEA,Americas,APAC",
     },
     # STMicroelectronics — #1 in general-purpose MCUs; automotive design-win engine.
     {
@@ -62,8 +63,9 @@ ROWS = [
         "source_url": "https://www.sec.gov/Archives/edgar/data/0000932787/000093278726000022/q126earningspressrelease-2.htm",
         "tags": "stmicro,st,mcu,microcontroller,automotive,industrial,analog",
         "verdict_horizon": "",
-        "device_type": "MCU,analog",
-        "affected_industries": "automotive,industrial",
+        "device_type": "MCU,Analog",
+        "affected_industries": "Automotive,Industrial",
+        "region": "EMEA,Americas,APAC",
     },
 ]
 

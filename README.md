@@ -50,18 +50,30 @@ curl -X POST https://<your-app>/signals \
     "tags": "tsmc,cowos,packaging,ai",
     "verdict_horizon": "2026-09-30",
     "device_type": "DRAM,HBM",
-    "affected_industries": "datacenter,automotive"
+    "affected_industries": "Computing,Automotive",
+    "region": "APAC,Americas"
   }'
 ```
 
 `signal_type` vocabulary: `capex_cut`, `equipment_absence`, `hiring`,
 `subsidy`, `customs`, `allocation`, `other`. Severity 1 (noise) → 5 (alarm).
 
-`device_type` (optional, comma-separated, IDC/Gartner-style vocab): `DRAM`,
-`HBM`, `NAND`, `eMMC/UFS` (a NAND sub-tag), `MCU`, `analog`, `discretes`,
-`logic`. `affected_industries` (optional, comma-separated): `automotive`,
-`industrial`, `datacenter`, `pc`, `consumer`, `mobile`. Both are what let a
-buyer filter the ledger to just their bill of materials.
+The taxonomy fields below follow the standard WSTS / IC Insights market-report
+segmentation, so the ledger reads in the vocabulary procurement teams already
+use. All are optional, comma-separated, and let a buyer filter to their bill of
+materials.
+
+- **`device_type`** — `DRAM`, `NAND`, `NOR`, `MCU`, `DSP`, `Logic`, `Analog`,
+  `ASIC`, `ASSP`, `Discretes`, `Optoelectronics`. Sub-tags `HBM` (under DRAM) and
+  `eMMC/UFS` (under NAND) carry the finer distinction the coarse groups lose.
+- **`affected_industries`** — `Automotive`, `Computing`, `Consumer`,
+  `Industrial`, `Wired infrastructure`, `Wireless communication`.
+- **`region`** — `Americas`, `EMEA`, `Japan`, `China`, `APAC`.
+- **Company** is the `entity` field itself (e.g. `NXP Semiconductors`, `Micron`,
+  `ASML`) — the fourth axis of the same report structure, already filterable via
+  `?q=`. Coverage universe spans the major memory makers (Micron, Samsung, SK
+  hynix, KIOXIA), automotive/MCU (NXP, STMicroelectronics, Infineon, Renesas,
+  Microchip), foundry/OSAT, and equipment (ASML, Lam, Applied Materials).
 
 `verdict_horizon` (optional, `YYYY-MM-DD`) is the date by which a *forward-looking*
 call can be scored true or false — leave it blank for backward-looking or
@@ -75,7 +87,8 @@ graded against reality before you show the demo.
 - `POST /ask` — `{question}` → `{verdict, answer, signals[], as_of}`
 - `POST /signals` — log a signal (needs `X-Ledger-Key` header)
 - `GET  /signals?q=magdeburg` — inspect the ledger. Filter to a buyer's BOM with
-  `?device=eMMC` or `?industry=automotive` (both match on the comma-separated tags)
+  `?device=eMMC`, `?industry=Automotive`, or `?region=APAC` (each matches on the
+  comma-separated tags; combine them freely)
 - `GET  /health` — row count + whether LLM mode is on
 
 ## Deploy to Railway
