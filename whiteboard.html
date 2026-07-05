@@ -373,11 +373,46 @@
   .stamp.medium { color: var(--ledger-blue); border-color: var(--ledger-blue); }
   .stamp.low    { color: var(--ink-faint);  border-color: var(--ink-faint); opacity: 0.7; }
 
+  /* ---------- Synthesis desk (signal -> insight) ---------- */
+  .synthesis { margin-top: 44px; display: none; }
+  .synthesis.visible { display: block; }
+  .synth-guard {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border: 1px solid var(--rule);
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  .insight { border-top: 1px solid var(--rule); padding: 22px 0 6px; }
+  .insight:first-child { border-top: 0; padding-top: 4px; }
+  .insight-type {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ledger-blue);
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .insight-type.tension { color: var(--ribbon-red); }
+  .insight-claim { font-size: 17px; line-height: 1.6; margin-bottom: 14px; }
+  .insight-cites { margin-left: 2px; }
+  .cites-label {
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 2px;
+  }
+  .synth-note { font-size: 14px; color: var(--ink-faint); font-style: italic; padding: 10px 0; }
+
   @media (max-width: 520px) {
     .signal { grid-template-columns: 1fr; gap: 2px; }
     .action { grid-template-columns: 1fr; gap: 2px; }
     .dispatch-head { flex-direction: column-reverse; }
     .stamp { align-self: flex-start; }
+    .synth-guard { align-self: flex-start; }
     .field.num input { width: 100%; }
   }
 
@@ -431,6 +466,31 @@
         <div class="signals-label">Evidence — dated at time of logging</div>
         <div id="signal-rows"></div>
       </div>
+    </section>
+
+    <hr class="rule desk-divider" aria-hidden="true">
+
+    <div class="prompt-label" style="margin-top:40px">Synthesis desk — what these signals mean together</div>
+    <div class="ask-row">
+      <span class="caret-mark" aria-hidden="true">&gt;</span>
+      <input id="s-question" type="text"
+             value="What does the memory market mean together?"
+             placeholder="A topic to read across…"
+             autocomplete="off" spellcheck="false"
+             aria-label="Topic to synthesize insights across">
+      <button class="send" id="synth">Synthesize</button>
+    </div>
+    <div class="ask-hint">Reads across the matching rows for insights no single row states — each grounded in ≥2 dated signals, and unsupported claims are dropped.</div>
+
+    <div class="status" id="s-status" role="status">reading across the ledger&hellip;</div>
+
+    <section class="synthesis" id="synthesis" aria-live="polite">
+      <div class="dispatch-head">
+        <div class="dispatch-meta" id="s-meta"></div>
+        <div class="synth-guard" id="s-guard" hidden></div>
+      </div>
+      <div id="s-insights"></div>
+      <div class="synth-note" id="s-note" hidden></div>
     </section>
 
     <hr class="rule desk-divider" aria-hidden="true">
@@ -781,9 +841,134 @@ function renderDecision(d) {
   $decision.classList.add("visible");
 }
 
+/* ---------- Synthesis desk ---------- */
+const SYNTH_URL = "/synthesize";  // FastAPI /synthesize; grounded cross-row insights
+
+const $sQ = document.getElementById("s-question");
+const $synthBtn = document.getElementById("synth");
+const $sStatus = document.getElementById("s-status");
+const $synthesis = document.getElementById("synthesis");
+const $sMeta = document.getElementById("s-meta");
+const $sGuard = document.getElementById("s-guard");
+const $sInsights = document.getElementById("s-insights");
+const $sNote = document.getElementById("s-note");
+
+async function synthesize() {
+  const question = $sQ.value.trim();
+  if (!question) { $sQ.focus(); return; }
+  setSynthing(true);
+  resetSynth();
+  $sStatus.textContent = "reading across the ledger…";
+  $sStatus.classList.add("visible");
+
+  try {
+    const res = await fetch(SYNTH_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+    if (!res.ok) throw new Error("Bad response: " + res.status);
+    const data = await res.json();
+    $sStatus.classList.remove("visible");
+    renderSynthesis(question, data);
+  } catch (err) {
+    $sStatus.textContent =
+      "The synthesis desk did not respond. Check that the API endpoint is reachable, then try again.";
+  } finally {
+    setSynthing(false);
+  }
+}
+
+function setSynthing(b) { $synthBtn.disabled = b; $sQ.disabled = b; }
+
+function resetSynth() {
+  $synthesis.classList.remove("visible");
+  $sInsights.innerHTML = "";
+  $sGuard.hidden = true;
+  $sNote.hidden = true;
+}
+
+function renderSynthesis(question, data) {
+  $sMeta.innerHTML =
+    "RE: " + escapeHtml((question || "").toUpperCase()) + "<br>" +
+    "SYNTHESIS " + escapeHtml(data.as_of || "");
+
+  // Guard badge — surfaces the grounding: rows read, unsupported dropped.
+  let guard = (data.signals_considered || 0) + " signals read";
+  if (data.dropped > 0) guard += " · " + data.dropped + " unsupported dropped";
+  $sGuard.textContent = guard;
+  $sGuard.hidden = false;
+
+  $sInsights.innerHTML = "";
+  for (const ins of (data.insights || [])) {
+    const art = document.createElement("article");
+    art.className = "insight";
+
+    const ty = document.createElement("div");
+    ty.className = "insight-type" + (ins.insight_type === "tension" ? " tension" : "");
+    ty.textContent = (ins.insight_type || "").replace(/_/g, " ");
+    art.appendChild(ty);
+
+    const claim = document.createElement("div");
+    claim.className = "insight-claim";
+    claim.textContent = ins.claim || "";
+    art.appendChild(claim);
+
+    const cites = ins.supporting || [];
+    if (cites.length) {
+      const wrap = document.createElement("div");
+      wrap.className = "insight-cites";
+      const lab = document.createElement("div");
+      lab.className = "cites-label";
+      lab.textContent = "Grounded in";
+      wrap.appendChild(lab);
+      for (const s of cites) {
+        const row = document.createElement("div");
+        row.className = "signal";
+        const dt = document.createElement("div");
+        dt.className = "date";
+        dt.textContent = s.date || "";
+        const t = document.createElement("div");
+        t.textContent = (s.entity ? s.entity + " — " : "") + (s.text || "");
+        if (s.source) {
+          const src = document.createElement("span");
+          src.className = "src";
+          if (s.source_url) {
+            const a = document.createElement("a");
+            a.href = s.source_url;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.style.color = "inherit";
+            a.textContent = "— " + s.source;
+            src.appendChild(a);
+          } else {
+            src.textContent = "— " + s.source;
+          }
+          t.appendChild(src);
+        }
+        row.appendChild(dt);
+        row.appendChild(t);
+        wrap.appendChild(row);
+      }
+      art.appendChild(wrap);
+    }
+    $sInsights.appendChild(art);
+  }
+
+  if (data.note) {
+    $sNote.textContent = data.note;
+    $sNote.hidden = false;
+  }
+
+  $synthesis.classList.add("visible");
+}
+
 /* ---------- Events ---------- */
 $send.addEventListener("click", ask);
 $q.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+
+$synthBtn.addEventListener("click", synthesize);
+$sQ.addEventListener("keydown", e => { if (e.key === "Enter") synthesize(); });
 
 $decideBtn.addEventListener("click", decide);
 for (const el of [$dPart, $dVol, $dCov]) {
