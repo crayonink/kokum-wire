@@ -81,15 +81,21 @@ def init_db():
                 source        TEXT NOT NULL,          -- e.g. 'Intel Q1 2023 earnings call'
                 source_url    TEXT DEFAULT '',
                 tags          TEXT DEFAULT '',        -- comma-separated: 'intel,fab,europe,mcu'
-                verdict_horizon TEXT DEFAULT ''       -- YYYY-MM-DD by which a forward call
+                verdict_horizon TEXT DEFAULT '',      -- YYYY-MM-DD by which a forward call
                                                       -- can be scored true/false ('' = not a call)
+                device_type     TEXT DEFAULT '',      -- IDC/Gartner device vocab, comma-sep:
+                                                      -- DRAM, HBM, NAND, eMMC/UFS, MCU,
+                                                      -- analog, discretes, logic
+                affected_industries TEXT DEFAULT ''   -- comma-sep: automotive, industrial,
+                                                      -- datacenter, pc, consumer, mobile
             )
             """
         )
-        # Idempotent migration: add verdict_horizon to a pre-existing table.
+        # Idempotent migration: add any missing columns to a pre-existing table.
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(signals)")}
-        if "verdict_horizon" not in cols:
-            conn.execute("ALTER TABLE signals ADD COLUMN verdict_horizon TEXT DEFAULT ''")
+        for col in ("verdict_horizon", "device_type", "affected_industries"):
+            if col not in cols:
+                conn.execute(f"ALTER TABLE signals ADD COLUMN {col} TEXT DEFAULT ''")
 
 
 init_db()
@@ -106,6 +112,12 @@ class SignalIn(BaseModel):
     tags: str = ""
     verdict_horizon: str = Field(
         "", description="YYYY-MM-DD by which this call can be scored true/false; blank if not a forward call"
+    )
+    device_type: str = Field(
+        "", description="IDC/Gartner device vocab, comma-separated: DRAM, HBM, NAND, eMMC/UFS, MCU, analog, discretes, logic"
+    )
+    affected_industries: str = Field(
+        "", description="comma-separated industries this touches: automotive, industrial, datacenter, pc, consumer, mobile"
     )
 
 
@@ -134,8 +146,9 @@ def insert_signal(s: SignalIn) -> int:
         cur = conn.execute(
             """INSERT INTO signals
                (logged_at, observed_date, entity, signal_type, severity,
-                note, source, source_url, tags, verdict_horizon)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                note, source, source_url, tags, verdict_horizon,
+                device_type, affected_industries)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 s.observed_date,
@@ -147,6 +160,8 @@ def insert_signal(s: SignalIn) -> int:
                 s.source_url.strip(),
                 s.tags.strip().lower(),
                 s.verdict_horizon.strip(),
+                s.device_type.strip(),
+                s.affected_industries.strip().lower(),
             ),
         )
         return cur.lastrowid
@@ -214,7 +229,8 @@ def retrieve(question: str, limit: int = 25) -> list[dict]:
     scored = []
     for r in rows:
         haystack = " ".join(
-            [r["entity"], r["note"], r["tags"], r["signal_type"]]
+            [r["entity"], r["note"], r["tags"], r["signal_type"],
+             r["device_type"], r["affected_industries"]]
         ).lower()
         score = sum(1 for terms in term_sets if any(t in haystack for t in terms))
         if score >= 1:  # any strong term matches; ranking floats the best rows up
@@ -738,6 +754,8 @@ def ask(body: AskIn):
                 "text": s["note"],
                 "source": s["source"],
                 "horizon": s["verdict_horizon"],
+                "device_type": s["device_type"],
+                "affected_industries": s["affected_industries"],
             }
             for s in signals[:8]
         ],
@@ -784,9 +802,29 @@ def add_signal(body: SignalIn, x_ledger_key: str = Header(default="")):
     return {"id": insert_signal(body)}
 
 
+def _tagset(s: str) -> list[str]:
+    return [t.strip().lower() for t in (s or "").split(",") if t.strip()]
+
+
+def filter_rows(rows: list[dict], device: str, industry: str) -> list[dict]:
+    """Keep rows whose device_type / affected_industries include the requested
+    tag (substring match, so 'eMMC' matches 'eMMC/UFS'). Lets a buyer see only
+    what touches their BOM — e.g. device=MCU or industry=automotive."""
+    dev, ind = device.strip().lower(), industry.strip().lower()
+    out = []
+    for r in rows:
+        if dev and not any(dev in t for t in _tagset(r["device_type"])):
+            continue
+        if ind and not any(ind in t for t in _tagset(r["affected_industries"])):
+            continue
+        out.append(r)
+    return out
+
+
 @app.get("/signals")
-def list_signals(q: str = "", limit: int = 50):
-    return {"signals": retrieve(q, limit=min(limit, 200))}
+def list_signals(q: str = "", device: str = "", industry: str = "", limit: int = 50):
+    rows = filter_rows(retrieve(q, limit=200), device, industry)
+    return {"signals": rows[:min(limit, 200)]}
 
 
 @app.get("/health")

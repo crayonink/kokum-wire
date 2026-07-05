@@ -48,6 +48,8 @@ ROWS = [
         "source_url": "https://www.buysellram.com/blog/dram-nand-prices-mid-2026/",
         "tags": "dram,nand,cycle,inflection,spot,pricing",
         "verdict_horizon": "2026-07-27",
+        "device_type": "DRAM,NAND",
+        "affected_industries": "automotive,industrial,consumer,datacenter",
     },
     # 2 — NAND overtakes DRAM (CONCERN for flash buyers).
     {
@@ -60,6 +62,8 @@ ROWS = [
         "source_url": "https://www.tomshardware.com/pc-components/dram/dram-and-nand-contract-prices-to-climb-again-in-q2",
         "tags": "nand,emmc,ufs,ssd,allocation,automotive,embedded",
         "verdict_horizon": "2026-07-27",
+        "device_type": "NAND,eMMC/UFS",
+        "affected_industries": "automotive,industrial",
     },
     # 3 — allocation lockout (CONCERN for small/mid buyers).
     {
@@ -72,6 +76,8 @@ ROWS = [
         "source_url": "https://www.tomshardware.com/pc-components/dram/micron-outlines-grim-outlook-for-dram-supply-in-first-earnings-call-since-killing-crucial-memory-and-ssd-brand-ceo-says-it-can-only-meet-half-to-two-thirds-of-demand",
         "tags": "dram,nand,allocation,leadtime,micron,phison,hyperscaler",
         "verdict_horizon": "2026-07-27",
+        "device_type": "DRAM,NAND",
+        "affected_industries": "automotive,industrial,consumer,datacenter",
     },
     # 4 — supply relief date (structural, log once).
     {
@@ -84,6 +90,8 @@ ROWS = [
         "source_url": "https://www.idc.com/resource-center/blog/global-memory-shortage-crisis-market-analysis-and-the-potential-impact-on-the-smartphone-and-pc-markets-in-2026/",
         "tags": "dram,nand,hbm,capacity,structural,idc,ddr5",
         "verdict_horizon": "2027-12-31",
+        "device_type": "DRAM,HBM,NAND",
+        "affected_industries": "datacenter,automotive,industrial",
     },
     # 5 — cost pass-through propagation (confirmed downstream impact).
     {
@@ -96,6 +104,8 @@ ROWS = [
         "source_url": "https://www.pcgamer.com/hardware/memory/hp-warns-that-memory-now-makes-up-around-35-percent-of-the-cost-its-pcs-double-that-of-a-year-ago/",
         "tags": "dell,cisco,oem,pc,server,passthrough,pricing",
         "verdict_horizon": "",
+        "device_type": "DRAM,NAND",
+        "affected_industries": "pc,datacenter",
     },
     # 6 — India OSAT capacity (INFO, capacity-side). Corroborated.
     {
@@ -108,6 +118,8 @@ ROWS = [
         "source_url": "https://www.ibtimes.co.in/india-approves-12-chip-manufacturing-projects-rs-1-64-lakh-crore-investment-pipeline-903349",
         "tags": "india,osat,packaging,test,subsidy,capacity",
         "verdict_horizon": "",
+        "device_type": "",
+        "affected_industries": "automotive,industrial,consumer",
     },
     # 7 — Vietnam MPW center (INFO, low priority; ecosystem only).
     {
@@ -120,6 +132,8 @@ ROWS = [
         "source_url": "",
         "tags": "vietnam,mpw,ecosystem,design",
         "verdict_horizon": "",
+        "device_type": "",
+        "affected_industries": "",
     },
 ]
 

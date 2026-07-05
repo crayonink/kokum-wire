@@ -49,6 +49,8 @@ ROWS = [
         "source_url": "https://www.asml.com/en/news/press-releases/2026/q1-2026-financial-results",
         "tags": "asml,euv,lithography,hbm,memory,capex,skhynix,china,capacity",
         "verdict_horizon": "2026-12-31",
+        "device_type": "DRAM,HBM,NAND,logic",
+        "affected_industries": "datacenter,pc,automotive",
     },
     # Lam Research — deposition/etch demand; the NAND-conversion timeline.
     {
@@ -61,6 +63,8 @@ ROWS = [
         "source_url": "https://www.fool.com/earnings/call-transcripts/2026/04/22/lam-research-lrcx-q3-2026-earnings-transcript/",
         "tags": "lamresearch,wfe,nand,dram,etch,deposition,capex,china,capacity",
         "verdict_horizon": "2027-12-31",
+        "device_type": "DRAM,NAND",
+        "affected_industries": "datacenter,automotive,industrial,consumer",
     },
 ]
 

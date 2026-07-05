@@ -48,12 +48,20 @@ curl -X POST https://<your-app>/signals \
     "source": "TSMC Q2 2026 earnings call",
     "source_url": "https://...",
     "tags": "tsmc,cowos,packaging,ai",
-    "verdict_horizon": "2026-09-30"
+    "verdict_horizon": "2026-09-30",
+    "device_type": "DRAM,HBM",
+    "affected_industries": "datacenter,automotive"
   }'
 ```
 
 `signal_type` vocabulary: `capex_cut`, `equipment_absence`, `hiring`,
 `subsidy`, `customs`, `allocation`, `other`. Severity 1 (noise) → 5 (alarm).
+
+`device_type` (optional, comma-separated, IDC/Gartner-style vocab): `DRAM`,
+`HBM`, `NAND`, `eMMC/UFS` (a NAND sub-tag), `MCU`, `analog`, `discretes`,
+`logic`. `affected_industries` (optional, comma-separated): `automotive`,
+`industrial`, `datacenter`, `pc`, `consumer`, `mobile`. Both are what let a
+buyer filter the ledger to just their bill of materials.
 
 `verdict_horizon` (optional, `YYYY-MM-DD`) is the date by which a *forward-looking*
 call can be scored true or false — leave it blank for backward-looking or
@@ -66,7 +74,8 @@ graded against reality before you show the demo.
 - `GET  /` — the whiteboard
 - `POST /ask` — `{question}` → `{verdict, answer, signals[], as_of}`
 - `POST /signals` — log a signal (needs `X-Ledger-Key` header)
-- `GET  /signals?q=magdeburg` — inspect the ledger
+- `GET  /signals?q=magdeburg` — inspect the ledger. Filter to a buyer's BOM with
+  `?device=eMMC` or `?industry=automotive` (both match on the comma-separated tags)
 - `GET  /health` — row count + whether LLM mode is on
 
 ## Deploy to Railway
