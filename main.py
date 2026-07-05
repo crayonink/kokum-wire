@@ -36,6 +36,9 @@ DB_PATH = os.environ.get("DB_PATH", str(Path(__file__).parent / "ledger.db"))
 WRITE_KEY = os.environ.get("LEDGER_WRITE_KEY", "changeme")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 MODEL = os.environ.get("KOKUM_MODEL", "claude-sonnet-5")
+# Synthesis is genuine cross-row reasoning, not phrasing — worth a stronger
+# model than the dispatch. Opus 4.8 by default; overridable.
+SYNTH_MODEL = os.environ.get("KOKUM_SYNTH_MODEL", "claude-opus-4-8")
 
 VERDICTS = ["CLEAR", "WATCH", "CONCERN", "DOUBTFUL"]
 
@@ -120,6 +123,10 @@ class DecideIn(BaseModel):
     coverage_months: float = Field(
         0, ge=0, description="months of inventory + contracted supply on hand"
     )
+
+
+class SynthesizeIn(BaseModel):
+    question: str = ""
 
 
 def insert_signal(s: SignalIn) -> int:
@@ -342,6 +349,149 @@ def compose_fallback(question: str, signals: list[dict]) -> dict:
         lines.append(f"({d}) {s['note']} — {s['source']}.")
     lines += ["", "[Composed without LLM — set ANTHROPIC_API_KEY for full dispatches.]"]
     return {"verdict": verdict, "answer": "\n".join(lines)}
+
+
+# ----------------------------------------------------------------------
+# Layer 2c — synthesis (signal -> insight)
+#
+# Cross-row reasoning: surface claims that emerge from combining >=2 dated rows,
+# which no single row states. This is the one place the model genuinely reasons
+# rather than phrases, so it's also where hallucination could enter — the guard
+# is grounding: the model cites signal numbers, and we DROP any insight whose
+# citations aren't real rows in the retrieved set. Every surviving claim is
+# traceable to specific dated, sourced rows.
+# ----------------------------------------------------------------------
+SYNTH_SYSTEM = """You are a senior semiconductor supply-chain analyst writing for
+procurement leaders.
+
+You receive a QUESTION and a numbered list of dated LEDGER SIGNALS. Your job is
+SYNTHESIS: surface insights that emerge from combining TWO OR MORE signals — a
+claim no single signal states on its own. Insight types:
+  cross_row_inference — combining signals implies a conclusion none states alone
+  tension            — signals point in conflicting directions; name the conflict
+  causal_chain       — signals link into a cause -> effect sequence
+  convergence        — independent signals corroborate the same conclusion
+
+Rules, absolute:
+1. Every insight must combine AT LEAST TWO signals; cite them by their [number].
+2. Use ONLY facts present in the cited signals. No outside knowledge, no figures
+   not in the signals, no speculation the signals don't support.
+3. If the signals do not support a genuine multi-signal insight, return an EMPTY
+   list. Do not manufacture connections to fill space — fewer real insights beat
+   many shallow ones. Cap at 4.
+4. Each claim is one or two plain, specific sentences a commodity manager can act
+   on. Lead with the conclusion.
+
+Reply with ONLY JSON:
+{"insights":[{"claim":"...","insight_type":"...","signal_numbers":[1,4]}]}"""
+
+
+# Structured-output schema. Array-size limits (>=2 numbers) aren't expressible in
+# the schema, so they're enforced in ground_insights() below.
+INSIGHT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "insights": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "claim": {"type": "string"},
+                    "insight_type": {
+                        "type": "string",
+                        "enum": ["cross_row_inference", "tension",
+                                 "causal_chain", "convergence"],
+                    },
+                    "signal_numbers": {
+                        "type": "array", "items": {"type": "integer"},
+                    },
+                },
+                "required": ["claim", "insight_type", "signal_numbers"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["insights"],
+    "additionalProperties": False,
+}
+
+
+def synthesize_insights(question: str, signals: list[dict]) -> list[dict]:
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+    numbered = "\n".join(
+        f"[{i}] observed {s['observed_date']} | {s['entity']} | "
+        f"sev {s['severity']}/5 | {s['note']} | source: {s['source']}"
+        for i, s in enumerate(signals, 1)
+    )
+    q = question or "What do these signals mean together?"
+    kwargs = dict(
+        model=SYNTH_MODEL,
+        max_tokens=3000,
+        # Synthesis is the reasoning task — thinking ON (unlike the dispatch).
+        thinking={"type": "adaptive"},
+        system=SYNTH_SYSTEM,
+        messages=[
+            {
+                "role": "user",
+                "content": f"QUESTION: {q}\n\nLEDGER SIGNALS (numbered):\n{numbered}",
+            }
+        ],
+    )
+    try:
+        msg = client.messages.create(
+            **kwargs,
+            output_config={
+                "effort": "high",
+                "format": {"type": "json_schema", "schema": INSIGHT_SCHEMA},
+            },
+        )
+    except anthropic.BadRequestError:
+        msg = client.messages.create(**kwargs)
+    text = "".join(b.text for b in msg.content if b.type == "text").strip()
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.S).strip()
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", text, re.S)
+        if not m:
+            raise
+        data = json.loads(m.group(0))
+    return data.get("insights", [])
+
+
+def ground_insights(raw_insights: list[dict],
+                    signals: list[dict]) -> tuple[list[dict], int]:
+    """The anti-hallucination guard. Keep only insights that cite >=2 real rows
+    from the set we handed the model; map their citations to the dated rows.
+    Returns (grounded_insights, dropped_count)."""
+    n = len(signals)
+    grounded, dropped = [], 0
+    for ins in raw_insights or []:
+        claim = (ins.get("claim") or "").strip()
+        nums = sorted({
+            int(x) for x in ins.get("signal_numbers", [])
+            if isinstance(x, bool) is False and str(x).lstrip("-").isdigit()
+        })
+        nums = [x for x in nums if 1 <= x <= n]  # only citations that exist
+        if not claim or len(nums) < 2:           # synthesis needs >=2 real rows
+            dropped += 1
+            continue
+        supporting = [{
+            "n": x,
+            "date": signals[x - 1]["observed_date"],
+            "entity": signals[x - 1]["entity"],
+            "text": signals[x - 1]["note"],
+            "source": signals[x - 1]["source"],
+            "source_url": signals[x - 1].get("source_url", ""),
+        } for x in nums]
+        grounded.append({
+            "claim": claim,
+            "insight_type": ins.get("insight_type", "cross_row_inference"),
+            "supporting": supporting,
+        })
+    return grounded, dropped
 
 
 # ----------------------------------------------------------------------
@@ -581,6 +731,31 @@ def ask(body: AskIn):
         ],
         "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
     }
+
+
+@app.post("/synthesize")
+def synthesize(body: SynthesizeIn):
+    signals = retrieve(body.question)
+    as_of = datetime.now(timezone.utc).strftime("%d %b %Y").upper()
+    base = {"question": body.question, "insights": [], "dropped": 0,
+            "signals_considered": len(signals), "as_of": as_of}
+    if len(signals) < 2:
+        return {**base, "note": "Need at least two related signals to synthesize "
+                                "across. Broaden the question."}
+    if not ANTHROPIC_API_KEY:
+        return {**base, "note": "Synthesis is genuine reasoning — it requires the "
+                                "LLM. Set ANTHROPIC_API_KEY."}
+    try:
+        raw = synthesize_insights(body.question, signals)
+    except Exception as e:
+        print(f"[/synthesize] failed: {type(e).__name__}: {e}", flush=True)
+        return {**base, "note": "Synthesis call failed; see server logs."}
+    grounded, dropped = ground_insights(raw, signals)
+    note = None
+    if not grounded:
+        note = ("No multi-signal insight the evidence supports — the ledger's "
+                "rows on this don't yet connect into one.")
+    return {**base, "insights": grounded, "dropped": dropped, "note": note}
 
 
 @app.post("/decide")
