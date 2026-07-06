@@ -20,7 +20,7 @@ every substantive row. Corrections applied vs the original analyst brief:
     call is flagged as a contested minority view.
 
 Usage (PowerShell):
-    $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
+    $env:KOKUM_URL = "https://wire.kokumlabs.in"
     $env:LEDGER_WRITE_KEY = "<the key you set in Railway>"
     python seed_cycle2026.py
 

@@ -20,7 +20,7 @@ credibility is that the numbers and dates are real. ST's exact Q1 2026 report
 date in particular should be confirmed (late April 2026 is an estimate).
 
 Usage (PowerShell):
-    $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
+    $env:KOKUM_URL = "https://wire.kokumlabs.in"
     $env:LEDGER_WRITE_KEY = "<the key you set in Railway>"
     python seed_mcu_auto.py
 

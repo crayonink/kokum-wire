@@ -13,7 +13,7 @@ rows that are already on the ledger; if the NXP / STMicro rows aren't there yet,
 run seed_mcu_auto.py as well to create them (already tagged).
 
 Usage (PowerShell):
-    $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
+    $env:KOKUM_URL = "https://wire.kokumlabs.in"
     $env:LEDGER_WRITE_KEY = "<the key you set in Railway>"
     python seed_backfill_taxonomy.py
 """

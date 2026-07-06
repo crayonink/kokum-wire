@@ -3,7 +3,7 @@ Pre-demo check for a live Kokum Wire instance. Read-only: it does NOT write
 to the ledger. Run it against your Railway URL right before demoing.
 
 Usage (PowerShell):
-    $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
+    $env:KOKUM_URL = "https://wire.kokumlabs.in"
     python preflight.py
 
 Exit code is 0 only if every check passes.
@@ -45,7 +45,7 @@ def post(path: str, body: dict, headers: dict):
 
 def main() -> None:
     if not BASE:
-        sys.exit("Set KOKUM_URL, e.g. https://kokum-wire-production.up.railway.app")
+        sys.exit("Set KOKUM_URL, e.g. https://wire.kokumlabs.in")
     print(f"Kokum Wire pre-flight against {BASE}\n")
 
     # 1. Health / reachability

@@ -21,7 +21,7 @@ Before publishing to the demo, re-check each figure against the primary document
 linked in source_url — the ledger's whole credibility is that the numbers are real.
 
 Usage (PowerShell):
-    $env:KOKUM_URL = "https://kokum-wire-production.up.railway.app"
+    $env:KOKUM_URL = "https://wire.kokumlabs.in"
     $env:LEDGER_WRITE_KEY = "<the key you set in Railway>"
     python seed_wfe.py
 
