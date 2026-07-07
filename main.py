@@ -29,6 +29,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+from archetypes import ARCHETYPES
+
 # ----------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------
@@ -855,6 +857,68 @@ def list_signals(q: str = "", device: str = "", industry: str = "",
                  region: str = "", limit: int = 50):
     rows = filter_rows(retrieve(q, limit=200), device, industry, region)
     return {"signals": rows[:min(limit, 200)]}
+
+
+# ----------------------------------------------------------------------
+# Layer 1b — company flow (the archetype journey, signal-overlaid)
+#
+# A company-anchored view: products -> device types -> designers -> fabs ->
+# OSATs -> distributors -> the line, with the ledger's live signal state on each
+# device. The chain entities are the INFERRED typical universe (archetypes.py);
+# the signal state is a real query over the dated rows. See docs/pricol-archetype.md.
+# ----------------------------------------------------------------------
+def flow_signal(match_tokens: list[str], all_rows: list[dict]) -> tuple[str, list[dict]]:
+    """Signal state for one device node: scan the ledger for rows whose
+    device_type/tags contain any match token. HOT if any matched row is severity
+    >= 3, CALM if matched but all <= 2, DARK if none. Returns (state, up-to-4
+    evidence rows, most-severe first)."""
+    toks = [t.lower() for t in match_tokens]
+    matches = [
+        r for r in all_rows
+        if any(t in (r["device_type"] + " " + r["tags"]).lower() for t in toks)
+    ]
+    if not matches:
+        return "DARK", []
+    matches.sort(key=lambda r: r["severity"], reverse=True)
+    state = "HOT" if matches[0]["severity"] >= 3 else "CALM"
+    ev = [{
+        "date": r["observed_date"], "entity": r["entity"], "text": r["note"],
+        "source": r["source"], "source_url": r["source_url"],
+        "device_type": r["device_type"],
+        "affected_industries": r["affected_industries"], "region": r["region"],
+    } for r in matches[:4]]
+    return state, ev
+
+
+@app.get("/flow")
+def flow(company: str = "pricol"):
+    arch = ARCHETYPES.get(company.strip().lower())
+    if not arch:
+        raise HTTPException(
+            status_code=404,
+            detail="No archetype for that company. Available: "
+                   + ", ".join(a["company"] for a in ARCHETYPES.values()),
+        )
+    with db() as conn:
+        all_rows = [dict(r) for r in conn.execute("SELECT * FROM signals")]
+    devices = []
+    for d in arch["devices"]:
+        state, ev = flow_signal(d["match"], all_rows)
+        devices.append({
+            "device": d["device"],
+            "designers": d["designers"],
+            "fab": d["fab"], "node": d["node"], "osat": d["osat"],
+            "distributors": d["distributors"],
+            "signal_state": state, "evidence": ev,
+        })
+    return {
+        "company": arch["company"],
+        "product": arch["product"],
+        "product_note": arch.get("product_note", ""),
+        "devices": devices,
+        "companies": [a["company"] for a in ARCHETYPES.values()],
+        "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
+    }
 
 
 @app.post("/admin/retag")

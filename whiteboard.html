@@ -433,9 +433,94 @@
   }
   .synth-note { font-size: 14px; color: var(--ink-faint); font-style: italic; padding: 10px 0; }
 
+  /* ---------- Company flow ---------- */
+  .flow-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 18px; }
+  .flow-select {
+    font-family: 'Courier Prime', monospace;
+    font-size: 18px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--ink);
+    padding: 6px 2px 8px;
+    outline: none;
+    border-radius: 0;
+    min-width: 200px;
+  }
+  .flow-select:focus-visible { border-bottom: 2px solid var(--ribbon-red); }
+
+  .flow { margin-top: 44px; display: none; }
+  .flow.visible { display: block; }
+  .flow-product {
+    font-family: 'Special Elite', 'Courier Prime', monospace;
+    font-size: clamp(17px, 3vw, 22px);
+    margin-bottom: 6px;
+  }
+  .flow-product .sub {
+    font-family: 'Courier Prime', monospace;
+    font-size: 12px;
+    color: var(--ink-faint);
+  }
+  .flow-note {
+    font-size: 12px;
+    color: var(--ink-faint);
+    font-style: italic;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .flow-device {
+    border-top: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    padding: 16px 0 16px 14px;
+    margin-top: 2px;
+  }
+  .flow-device.hot  { border-left-color: var(--ribbon-red); }
+  .flow-device.calm { border-left-color: var(--ledger-blue); }
+  .flow-device.dark { opacity: 0.7; }
+  .flow-dhead { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .flow-dname { font-size: 16px; font-weight: 700; }
+  .flow-badge {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border: 1px solid var(--rule);
+    padding: 1px 8px;
+    white-space: nowrap;
+  }
+  .flow-badge.hot  { color: var(--ribbon-red); border-color: var(--ribbon-red); }
+  .flow-badge.calm { color: var(--ledger-blue); border-color: var(--ledger-blue); }
+  .flow-badge.dark { color: var(--ink-faint); }
+  .flow-stage {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 12px;
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 2px 0;
+  }
+  .flow-stage-label {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-top: 3px;
+  }
+  .flow-chip {
+    display: inline-block;
+    font-size: 12px;
+    color: var(--ledger-blue);
+    border: 1px dashed var(--rule);
+    padding: 0 6px;
+    margin: 0 5px 4px 0;
+    font-style: italic;
+  }
+  .flow-plain { color: var(--ink); }
+  .flow-ev { margin-top: 12px; }
+
   @media (max-width: 520px) {
     .signal { grid-template-columns: 1fr; gap: 2px; }
     .action { grid-template-columns: 1fr; gap: 2px; }
+    .flow-stage { grid-template-columns: 1fr; gap: 2px; }
     .dispatch-head { flex-direction: column-reverse; }
     .stamp { align-self: flex-start; }
     .synth-guard { align-self: flex-start; }
@@ -572,6 +657,34 @@
         <div class="signals-label">Evidence — the ledger rows behind the call</div>
         <div id="d-evidence"></div>
       </div>
+    </section>
+
+    <hr class="rule desk-divider" aria-hidden="true">
+
+    <div class="prompt-label" style="margin-top:40px">Company flow — trace the chain</div>
+    <div class="flow-form">
+      <label class="field">
+        <span class="field-label">Company</span>
+        <select id="flow-company" class="flow-select" aria-label="Company to trace">
+          <option value="pricol">Pricol</option>
+        </select>
+      </label>
+      <button class="send" id="trace">Trace</button>
+    </div>
+    <div class="ask-hint">The chip journey behind a company's products — designers → fabs → packaging → distribution → the line — with live ledger signal on each part.</div>
+
+    <div class="status" id="flow-status" role="status">tracing the chain&hellip;</div>
+
+    <section class="flow" id="flow" aria-live="polite">
+      <div class="dispatch-head">
+        <div class="dispatch-meta" id="flow-meta"></div>
+        <div class="head-right">
+          <button class="close-x" id="close-flow" type="button" aria-label="Close this flow">&times;</button>
+        </div>
+      </div>
+      <div class="flow-product" id="flow-product"></div>
+      <div class="flow-note" id="flow-note"></div>
+      <div id="flow-devices"></div>
     </section>
   </main>
 
@@ -1021,6 +1134,127 @@ function renderSynthesis(question, data) {
   $synthesis.classList.add("visible");
 }
 
+/* ---------- Company flow ---------- */
+const FLOW_URL = "/flow";
+const $flowCompany = document.getElementById("flow-company");
+const $traceBtn = document.getElementById("trace");
+const $flowStatus = document.getElementById("flow-status");
+const $flow = document.getElementById("flow");
+const $flowMeta = document.getElementById("flow-meta");
+const $flowProduct = document.getElementById("flow-product");
+const $flowNote = document.getElementById("flow-note");
+const $flowDevices = document.getElementById("flow-devices");
+
+async function trace() {
+  const company = $flowCompany.value || "pricol";
+  setTracing(true);
+  resetFlow();
+  $flowStatus.textContent = "tracing the chain…";
+  $flowStatus.classList.add("visible");
+  try {
+    const res = await fetch(FLOW_URL + "?company=" + encodeURIComponent(company));
+    if (!res.ok) throw new Error("Bad response: " + res.status);
+    const data = await res.json();
+    $flowStatus.classList.remove("visible");
+    renderFlow(data);
+  } catch (err) {
+    $flowStatus.textContent =
+      "The flow desk did not respond. Check that the API endpoint is reachable, then try again.";
+  } finally {
+    setTracing(false);
+  }
+}
+
+function setTracing(b) { $traceBtn.disabled = b; $flowCompany.disabled = b; }
+function resetFlow() { $flow.classList.remove("visible"); $flowDevices.innerHTML = ""; }
+
+function flowChips(arr) {
+  return (arr || []).map(e => `<span class="flow-chip">${escapeHtml(e)}</span>`).join("");
+}
+
+function renderFlow(d) {
+  $flowMeta.innerHTML =
+    "RE: " + escapeHtml((d.company || "").toUpperCase()) + "<br>" +
+    "FLOW " + escapeHtml(d.as_of || "");
+  $flowProduct.innerHTML =
+    escapeHtml(d.product || "") +
+    (d.product_note ? ` <span class="sub">— ${escapeHtml(d.product_note)}</span>` : "");
+  $flowNote.textContent =
+    "Chain entities are the typical suppliers for each part class — inferred, " +
+    "not " + (d.company || "the company") + "'s confirmed vendors. " +
+    "Signal state is live from the dated ledger.";
+
+  $flowDevices.innerHTML = "";
+  for (const dev of d.devices || []) {
+    const st = (dev.signal_state || "dark").toLowerCase();
+    const block = document.createElement("div");
+    block.className = "flow-device " + st;
+
+    const head = document.createElement("div");
+    head.className = "flow-dhead";
+    const badge = document.createElement("span");
+    badge.className = "flow-badge " + st;
+    badge.textContent = dev.signal_state;
+    const name = document.createElement("span");
+    name.className = "flow-dname";
+    name.textContent = dev.device;
+    head.appendChild(badge);
+    head.appendChild(name);
+    block.appendChild(head);
+
+    const fab = escapeHtml(dev.fab || "—") + (dev.node ? " · " + escapeHtml(dev.node) : "");
+    const stages = [
+      ["Design", flowChips(dev.designers)],
+      ["Fab", `<span class="flow-plain">${fab}</span>`],
+      ["Package", `<span class="flow-plain">${escapeHtml(dev.osat || "—")}</span>`],
+      ["Distribute", flowChips(dev.distributors)],
+    ];
+    for (const [label, html] of stages) {
+      const row = document.createElement("div");
+      row.className = "flow-stage";
+      const l = document.createElement("div");
+      l.className = "flow-stage-label";
+      l.textContent = label;
+      const v = document.createElement("div");
+      v.innerHTML = html;
+      row.appendChild(l);
+      row.appendChild(v);
+      block.appendChild(row);
+    }
+
+    if ((dev.evidence || []).length) {
+      const ev = document.createElement("div");
+      ev.className = "signals visible flow-ev";
+      const lbl = document.createElement("div");
+      lbl.className = "signals-label";
+      lbl.textContent = "Live signal — dated";
+      ev.appendChild(lbl);
+      for (const s of dev.evidence) {
+        const row = document.createElement("div");
+        row.className = "signal";
+        const dt = document.createElement("div");
+        dt.className = "date";
+        dt.textContent = s.date || "";
+        const t = document.createElement("div");
+        t.textContent = s.text || "";
+        if (s.source) {
+          const src = document.createElement("span");
+          src.className = "src";
+          src.textContent = "— " + s.source;
+          t.appendChild(src);
+        }
+        appendTags(t, s);
+        row.appendChild(dt);
+        row.appendChild(t);
+        ev.appendChild(row);
+      }
+      block.appendChild(ev);
+    }
+    $flowDevices.appendChild(block);
+  }
+  $flow.classList.add("visible");
+}
+
 /* ---------- Events ---------- */
 $send.addEventListener("click", ask);
 $q.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
@@ -1033,10 +1267,14 @@ for (const el of [$dPart, $dVol, $dCov]) {
   el.addEventListener("keydown", e => { if (e.key === "Enter") decide(); });
 }
 
+$traceBtn.addEventListener("click", trace);
+$flowCompany.addEventListener("keydown", e => { if (e.key === "Enter") trace(); });
+
 /* Close (×) buttons — dismiss a panel after reading, refocus its input. */
 document.getElementById("close-dispatch").addEventListener("click", () => { resetDispatch(); $q.focus(); });
 document.getElementById("close-synth").addEventListener("click", () => { resetSynth(); $sQ.focus(); });
 document.getElementById("close-decision").addEventListener("click", () => { resetDecision(); $dPart.focus(); });
+document.getElementById("close-flow").addEventListener("click", () => { resetFlow(); $flowCompany.focus(); });
 
 $q.focus();
 </script>
