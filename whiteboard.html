@@ -110,6 +110,53 @@
     color: var(--ledger-blue);
   }
 
+  /* ---------- How-it-works helper ---------- */
+  .howto {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 280px;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    z-index: 50;
+    font-size: 12.5px;
+    line-height: 1.55;
+    box-shadow: 3px 3px 0 rgba(27, 26, 23, 0.10);
+  }
+  .howto-toggle {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+  .howto-body { padding: 12px 14px 14px; }
+  .howto-body p { margin-bottom: 9px; }
+  .howto-body ol { margin: 8px 0 10px; padding-left: 18px; }
+  .howto-body li { margin-bottom: 9px; }
+  .howto-body em { color: var(--ink-faint); font-style: italic; }
+  .howto.collapsed .howto-body { display: none; }
+  .howto-legend { color: var(--ink-faint); margin-top: 4px; }
+  .k-hot  { color: var(--ribbon-red); font-weight: 700; }
+  .k-calm { color: var(--ledger-blue); font-weight: 700; }
+  .k-dark { color: var(--ink-faint); font-weight: 700; }
+
+  @media (max-width: 1299px) {
+    .howto {
+      position: static;
+      width: auto;
+      margin: 0 0 28px;
+      box-shadow: none;
+    }
+  }
+
   .rule {
     margin: 22px auto 0;
     width: 100%;
@@ -536,6 +583,20 @@
 <body>
 <div class="sheet">
 
+  <aside class="howto" id="howto" aria-label="How Kokum Wire works">
+    <button class="howto-toggle" id="howto-toggle" aria-expanded="true">How it works &#9662;</button>
+    <div class="howto-body">
+      <p><strong>What it is:</strong> Kokum Wire watches the chip supply chain and tells you — with dates and sources — what just changed and what to do about it.</p>
+      <ol>
+        <li><strong>Ask the ledger</strong> — type a plain question.<br><em>e.g. "What changed in the memory market this week?"</em></li>
+        <li><strong>Synthesis desk</strong> — what the signals mean together.<br><em>e.g. "What does the memory market mean together?"</em></li>
+        <li><strong>Decision desk</strong> — buy now or later? Enter your part, units a month, and months of stock.<br><em>e.g. eMMC/UFS automotive · 50,000/mo · 2 months</em></li>
+        <li><strong>Company flow</strong> — pick a company to see the chips inside its products and where supply is tight.<br><em>e.g. Pricol</em></li>
+      </ol>
+      <p class="howto-legend"><span class="k-hot">red</span> = under stress · <span class="k-calm">blue</span> = calm · <span class="k-dark">gray</span> = no signal yet</p>
+    </div>
+  </aside>
+
   <header>
     <div class="masthead">Kokum Wire</div>
     <div class="tagline">Supply Chain Intelligence for Semiconductor Procurement</div>
@@ -740,6 +801,17 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").match
   const d = new Date();
   const fmt = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }).toUpperCase();
   document.getElementById("station-date").textContent = " — " + fmt;
+})();
+
+/* How-it-works toggle */
+(function () {
+  const box = document.getElementById("howto");
+  const btn = document.getElementById("howto-toggle");
+  btn.addEventListener("click", () => {
+    const collapsed = box.classList.toggle("collapsed");
+    btn.setAttribute("aria-expanded", String(!collapsed));
+    btn.textContent = "How it works " + (collapsed ? "▸" : "▾");
+  });
 })();
 
 /* ---------- Ask flow ---------- */
