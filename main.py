@@ -29,7 +29,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from archetypes import ARCHETYPES
+from archetypes import ARCHETYPES, COUNTRIES
 
 # ----------------------------------------------------------------------
 # Config
@@ -901,6 +901,12 @@ def flow(company: str = "pricol"):
         )
     with db() as conn:
         all_rows = [dict(r) for r in conn.execute("SELECT * FROM signals")]
+
+    # Per device: signal state from the ledger. Meanwhile accumulate a per-country
+    # fab-origin probability, and a stress score weighted by each device's state
+    # and its origin share — so a country that sources mostly HOT parts reads HOT.
+    SV = {"HOT": 2.0, "CALM": 1.0, "DARK": 0.0}
+    agg = {}  # country code -> {p: origin-share sum, sn/sd: stress numerator/denom}
     devices = []
     for d in arch["devices"]:
         state, ev = flow_signal(d["match"], all_rows)
@@ -911,11 +917,34 @@ def flow(company: str = "pricol"):
             "distributors": d["distributors"],
             "signal_state": state, "evidence": ev,
         })
+        for code, share in d.get("origins", {}).items():
+            a = agg.setdefault(code, {"p": 0.0, "sn": 0.0, "sd": 0.0})
+            a["p"] += share
+            a["sn"] += share * SV[state]
+            a["sd"] += share
+
+    total_p = sum(a["p"] for a in agg.values()) or 1.0
+    geo = []
+    for code, a in agg.items():
+        meta = COUNTRIES.get(code)
+        if not meta:
+            continue
+        stress = a["sn"] / a["sd"] if a["sd"] else 0.0
+        gstate = "HOT" if stress >= 1.5 else "CALM" if stress >= 0.5 else "DARK"
+        geo.append({
+            "code": code, "name": meta["name"],
+            "lon": meta["lon"], "lat": meta["lat"], "region": meta["region"],
+            "probability": round(a["p"] / total_p, 3),
+            "signal_state": gstate,
+        })
+    geo.sort(key=lambda g: -g["probability"])
+
     return {
         "company": arch["company"],
         "product": arch["product"],
         "product_note": arch.get("product_note", ""),
         "devices": devices,
+        "geo": geo,
         "companies": [a["company"] for a in ARCHETYPES.values()],
         "as_of": datetime.now(timezone.utc).strftime("%d %b %Y").upper(),
     }

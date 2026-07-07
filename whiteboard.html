@@ -564,6 +564,39 @@
   .flow-plain { color: var(--ink); }
   .flow-ev { margin-top: 12px; }
 
+  /* geo map */
+  .geomap {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 12px 0 8px;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+  }
+  .geo-continent {
+    fill: var(--ink-faint);
+    opacity: 0.4;
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    font-family: 'Courier Prime', monospace;
+  }
+  .geo-pct { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: 'Courier Prime', monospace; }
+  .geo-name { fill: var(--ink); font-size: 11px; font-family: 'Courier Prime', monospace; }
+  .geo-cap { font-size: 12px; color: var(--ink-faint); line-height: 1.5; margin: 4px 0 16px; }
+  .geo-list { display: flex; flex-direction: column; }
+  .geo-row {
+    display: grid;
+    grid-template-columns: 16px 1fr auto auto;
+    gap: 14px;
+    align-items: center;
+    font-size: 14px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .geo-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .geo-row .p { color: var(--ledger-blue); font-weight: 700; }
+  .geo-row .st { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+
   @media (max-width: 520px) {
     .signal { grid-template-columns: 1fr; gap: 2px; }
     .action { grid-template-columns: 1fr; gap: 2px; }
@@ -722,17 +755,17 @@
 
     <hr class="rule desk-divider" aria-hidden="true">
 
-    <div class="prompt-label" style="margin-top:40px">Company flow — trace the chain</div>
+    <div class="prompt-label" style="margin-top:40px">Chip origin map — where the silicon comes from</div>
     <div class="flow-form">
       <label class="field">
         <span class="field-label">Company</span>
-        <select id="flow-company" class="flow-select" aria-label="Company to trace">
+        <select id="flow-company" class="flow-select" aria-label="Company to map">
           <option value="pricol">Pricol</option>
         </select>
       </label>
-      <button class="send" id="trace">Trace</button>
+      <button class="send" id="trace">Map it</button>
     </div>
-    <div class="ask-hint">The chip journey behind a company's products — designers → fabs → packaging → distribution → the line — with live ledger signal on each part.</div>
+    <div class="ask-hint">A world map of where a company's chips are likely fabbed — bubble size = share of the parts, colour = live supply stress from the dated ledger.</div>
 
     <div class="status" id="flow-status" role="status">tracing the chain&hellip;</div>
 
@@ -745,7 +778,9 @@
       </div>
       <div class="flow-product" id="flow-product"></div>
       <div class="flow-note" id="flow-note"></div>
-      <div id="flow-devices"></div>
+      <div id="flow-map"></div>
+      <div class="geo-cap" id="flow-cap"></div>
+      <div class="geo-list" id="flow-geolist"></div>
     </section>
   </main>
 
@@ -1215,13 +1250,15 @@ const $flow = document.getElementById("flow");
 const $flowMeta = document.getElementById("flow-meta");
 const $flowProduct = document.getElementById("flow-product");
 const $flowNote = document.getElementById("flow-note");
-const $flowDevices = document.getElementById("flow-devices");
+const $flowMap = document.getElementById("flow-map");
+const $flowCap = document.getElementById("flow-cap");
+const $flowGeolist = document.getElementById("flow-geolist");
 
 async function trace() {
   const company = $flowCompany.value || "pricol";
   setTracing(true);
   resetFlow();
-  $flowStatus.textContent = "tracing the chain…";
+  $flowStatus.textContent = "mapping the origins…";
   $flowStatus.classList.add("visible");
   try {
     const res = await fetch(FLOW_URL + "?company=" + encodeURIComponent(company));
@@ -1238,91 +1275,98 @@ async function trace() {
 }
 
 function setTracing(b) { $traceBtn.disabled = b; $flowCompany.disabled = b; }
-function resetFlow() { $flow.classList.remove("visible"); $flowDevices.innerHTML = ""; }
-
-function flowChips(arr) {
-  return (arr || []).map(e => `<span class="flow-chip">${escapeHtml(e)}</span>`).join("");
+function resetFlow() {
+  $flow.classList.remove("visible");
+  $flowMap.innerHTML = ""; $flowCap.textContent = ""; $flowGeolist.innerHTML = "";
 }
+
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(name, attrs) {
+  const el = document.createElementNS(SVGNS, name);
+  for (const k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+const STATE_COLOR = { HOT: "#A8332A", CALM: "#5B6E8C", DARK: "#6B675C" };
 
 function renderFlow(d) {
   $flowMeta.innerHTML =
     "RE: " + escapeHtml((d.company || "").toUpperCase()) + "<br>" +
-    "FLOW " + escapeHtml(d.as_of || "");
+    "ORIGIN " + escapeHtml(d.as_of || "");
   $flowProduct.innerHTML =
     escapeHtml(d.product || "") +
     (d.product_note ? ` <span class="sub">— ${escapeHtml(d.product_note)}</span>` : "");
   $flowNote.textContent =
-    "Chain entities are the typical suppliers for each part class — inferred, " +
-    "not " + (d.company || "the company") + "'s confirmed vendors. " +
-    "Signal state is live from the dated ledger.";
+    "Origin shares are the typical fab geography for each part class — inferred, " +
+    "not " + (d.company || "the company") + "'s confirmed sourcing. " +
+    "Colour is live supply stress from the dated ledger.";
 
-  $flowDevices.innerHTML = "";
-  for (const dev of d.devices || []) {
-    const st = (dev.signal_state || "dark").toLowerCase();
-    const block = document.createElement("div");
-    block.className = "flow-device " + st;
+  const geo = (d.geo || []).slice().sort((a, b) => b.probability - a.probability);
 
-    const head = document.createElement("div");
-    head.className = "flow-dhead";
-    const badge = document.createElement("span");
-    badge.className = "flow-badge " + st;
-    badge.textContent = dev.signal_state;
-    const name = document.createElement("span");
-    name.className = "flow-dname";
-    name.textContent = dev.device;
-    head.appendChild(badge);
-    head.appendChild(name);
-    block.appendChild(head);
+  // ---- world map (equirectangular bubble map) ----
+  const W = 1000, H = 460;
+  const proj = (lon, lat) => [((lon + 180) / 360) * W, ((90 - lat) / 180) * H];
+  const svg = svgEl("svg", {
+    viewBox: `0 0 ${W} ${H}`, class: "geomap",
+    role: "img", "aria-label": "Chip origin exposure map",
+  });
+  for (let lon = -150; lon <= 150; lon += 30) {
+    const [x] = proj(lon, 0);
+    svg.appendChild(svgEl("line", { x1: x, y1: 0, x2: x, y2: H, stroke: "#D8D2C2", "stroke-width": 0.5, opacity: 0.5 }));
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const [, y] = proj(0, lat);
+    svg.appendChild(svgEl("line", { x1: 0, y1: y, x2: W, y2: y, stroke: "#D8D2C2", "stroke-width": 0.5, opacity: 0.5 }));
+  }
+  for (const [t, lon, lat] of [["NORTH AMERICA", -100, 48], ["EUROPE", 18, 56], ["EAST ASIA", 125, 50]]) {
+    const [x, y] = proj(lon, lat);
+    const tx = svgEl("text", { x, y, "text-anchor": "middle", class: "geo-continent" });
+    tx.textContent = t;
+    svg.appendChild(tx);
+  }
+  const maxp = Math.max(...geo.map(g => g.probability), 0.01);
+  for (const g of geo) {
+    const [x, y] = proj(g.lon, g.lat);
+    const r = 7 + (g.probability / maxp) * 26;
+    const col = STATE_COLOR[g.signal_state] || STATE_COLOR.DARK;
+    svg.appendChild(svgEl("circle", {
+      cx: x, cy: y, r, fill: col, "fill-opacity": 0.5, stroke: col, "stroke-width": 1.6,
+    }));
+    const pct = svgEl("text", { x, y: y + 4, "text-anchor": "middle", class: "geo-pct" });
+    pct.textContent = Math.round(g.probability * 100) + "%";
+    svg.appendChild(pct);
+    const nm = svgEl("text", { x, y: y + r + 13, "text-anchor": "middle", class: "geo-name" });
+    nm.textContent = g.name;
+    svg.appendChild(nm);
+  }
+  $flowMap.innerHTML = "";
+  $flowMap.appendChild(svg);
 
-    const fab = escapeHtml(dev.fab || "—") + (dev.node ? " · " + escapeHtml(dev.node) : "");
-    const stages = [
-      ["Design", flowChips(dev.designers)],
-      ["Fab", `<span class="flow-plain">${fab}</span>`],
-      ["Package", `<span class="flow-plain">${escapeHtml(dev.osat || "—")}</span>`],
-      ["Distribute", flowChips(dev.distributors)],
-    ];
-    for (const [label, html] of stages) {
-      const row = document.createElement("div");
-      row.className = "flow-stage";
-      const l = document.createElement("div");
-      l.className = "flow-stage-label";
-      l.textContent = label;
-      const v = document.createElement("div");
-      v.innerHTML = html;
-      row.appendChild(l);
-      row.appendChild(v);
-      block.appendChild(row);
-    }
+  $flowCap.textContent =
+    "Bubble size = share of the cluster's chips fabbed there. " +
+    "Colour: red = under stress · blue = calm · gray = no live signal yet.";
 
-    if ((dev.evidence || []).length) {
-      const ev = document.createElement("div");
-      ev.className = "signals visible flow-ev";
-      const lbl = document.createElement("div");
-      lbl.className = "signals-label";
-      lbl.textContent = "Live signal — dated";
-      ev.appendChild(lbl);
-      for (const s of dev.evidence) {
-        const row = document.createElement("div");
-        row.className = "signal";
-        const dt = document.createElement("div");
-        dt.className = "date";
-        dt.textContent = s.date || "";
-        const t = document.createElement("div");
-        t.textContent = s.text || "";
-        if (s.source) {
-          const src = document.createElement("span");
-          src.className = "src";
-          src.textContent = "— " + s.source;
-          t.appendChild(src);
-        }
-        appendTags(t, s);
-        row.appendChild(dt);
-        row.appendChild(t);
-        ev.appendChild(row);
-      }
-      block.appendChild(ev);
-    }
-    $flowDevices.appendChild(block);
+  // ---- ranked list ----
+  $flowGeolist.innerHTML = "";
+  for (const g of geo) {
+    const row = document.createElement("div");
+    row.className = "geo-row";
+    const dot = document.createElement("span");
+    dot.className = "geo-dot";
+    dot.style.background = STATE_COLOR[g.signal_state] || STATE_COLOR.DARK;
+    const nm = document.createElement("span");
+    nm.textContent = g.name;
+    const p = document.createElement("span");
+    p.className = "p";
+    p.textContent = Math.round(g.probability * 100) + "%";
+    const st = document.createElement("span");
+    st.className = "st";
+    st.style.color = STATE_COLOR[g.signal_state] || STATE_COLOR.DARK;
+    st.textContent = g.signal_state;
+    row.appendChild(dot);
+    row.appendChild(nm);
+    row.appendChild(p);
+    row.appendChild(st);
+    $flowGeolist.appendChild(row);
   }
   $flow.classList.add("visible");
 }
